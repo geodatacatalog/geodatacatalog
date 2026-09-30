@@ -1,0 +1,83 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "geodatacatalog"
+version = "0.1.0"
+description = "Fetch heterogeneous geospatial sources (WFS, WMS, WMTS, WCS, STAC, OSM, REST, Python plugins) through one YAML-configured catalog, with caching and parallel download."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Tanguy Duval" }]
+keywords = [
+    "geospatial", "gis", "stac", "wfs", "wms", "wmts", "wcs",
+    "sentinel", "copernicus", "ign", "catalog", "geopandas", "xarray",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: GIS",
+]
+
+dependencies = [
+    "aiohttp",
+    "diskcache",
+    "geopandas>=0.14",
+    "numpy",
+    "odc-stac",
+    "owslib",
+    "pandas",
+    "Pillow",
+    "pyogrio",        # geopandas vector IO engine (read_file/to_file/export)
+    "pyproj",
+    "pystac",
+    "pystac-client",
+    "pyyaml",
+    "rasterio",
+    "requests",
+    "rioxarray",
+    "shapely>=2.0",
+    "xarray",
+]
+
+[project.optional-dependencies]
+viz = ["folium", "ipywidgets"]
+osm = ["osmnx"]
+s3 = ["boto3"]                  # signed S3 downloads (e.g. Copernicus Data Space)
+overture = ["pmtiles", "mapbox-vector-tile", "mercantile", "duckdb"]  # Overture: vector-tile path (default, fast) + GeoParquet path (duckdb, exact)
+ai = ["anthropic", "rich", "questionary"]   # `geodatacatalog chat`: Claude + pretty markdown + interactive picker (Mistral needs no anthropic; questionary optional)
+serve = ["fastapi", "uvicorn", "watchfiles", "matplotlib"]  # HTTP sidecar (geodatacatalog.explorer.serve); watchfiles=--reload, matplotlib=raster colormap render
+jupyter = ["nest_asyncio", "ipywidgets", "folium"]
+netcdf = ["netcdf4", "odc-algo", "h5netcdf", "fsspec[http]", "s3fs"]  # h5netcdf+fsspec: windowed remote read of NetCDF/HDF5 STAC assets (e.g. PC deltares-floods); s3fs: those hosted on S3 (e.g. Copernicus CLMS *.nc)
+geoagent = ["GeoAgent[browser]>=1.8", "strands-agents[litellm]>=1.37"]  # opengeos GeoAgent tool pack (geoagent_tools/geoagent_serve); litellm = Mistral et al. via LiteLLM
+all = ["folium", "ipywidgets", "osmnx", "boto3", "duckdb", "pmtiles", "mapbox-vector-tile", "mercantile", "anthropic", "rich", "questionary", "fastapi", "uvicorn", "watchfiles", "matplotlib", "nest_asyncio", "netcdf4", "odc-algo", "h5netcdf", "fsspec[http]", "s3fs"]
+dev = ["pytest", "ruff"]
+
+[project.scripts]
+geodatacatalog = "geodatacatalog.explorer.cli:main"
+
+# Third-party tool-pack discovery hook (proposed upstream convention for
+# opengeos/GeoAgent): maps a pack name to a callable returning @geo_tool tools.
+[project.entry-points."geoagent.tool_packs"]
+geodatacatalog = "geodatacatalog.explorer.geoagent_tools:geodatacatalog_tools"
+
+[project.urls]
+Homepage = "https://github.com/tduval/geodatacatalog"
+Documentation = "https://github.com/tduval/geodatacatalog#readme"
+Issues = "https://github.com/tduval/geodatacatalog/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["geodatacatalog"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"

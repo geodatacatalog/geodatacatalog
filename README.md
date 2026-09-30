@@ -1,0 +1,456 @@
+# GeoDataCatalog
+
+**One catalog, one request, every geospatial source.**
+
+GeoDataCatalog aggregates heterogeneous geospatial sources — WFS, WMS, WMTS, WCS, STAC, OpenStreetMap, REST APIs and custom Python plugins — behind a single YAML configuration, with disk caching, parallel download and normalised outputs (`GeoDataFrame`, `xarray`, `pystac` items).
+
+```python
+from geodatacatalog import load_catalog, GeoRequest
+
+catalog = load_catalog("catalog.yml")
+request = GeoRequest(bbox=(1.42, 43.56, 1.46, 43.59),
+                     datetime="2024-06-01/2024-08-31")
+
+results = catalog.fetch(request, layers=[
+    "ign__communes",            # WFS  → GeoDataFrame
+    "ign_wmts__foret",          # WMTS → xarray.DataArray (categorical, legend)
+    "earth_search__S2_L2A",     # STAC → list[pystac.Item]
+])
+results.explore()               # interactive Folium map
+```
+
+The bundled [`catalog.yml`](catalog.yml) focuses on **open French and European data**: IGN Géoplateforme, Copernicus (Sentinel, EFFIS, Corine Land Cover), CNES THEIA, Hub'Eau, BRGM, SANDRE, ISRIC SoilGrids, GEBCO and OpenStreetMap. Adding a provider requires zero Python code.
+
+> Interactive walkthrough: see [example.ipynb](example.ipynb).
+
+---
+
+## Contents
+
+- [Why](#why)
+- [Installation](#installation)
+- [Quickstart](#quickstart)
+- [GeoRequest — the unified request](#georequest--the-unified-request)
+- [CatalogResults — working with results](#catalogresults--working-with-results)
+- [The STAC workflow](#the-stac-workflow)
+- [Configuration (catalog.yml)](#configuration-catalogyml)
+- [Bundled providers](#bundled-providers)
+- [Writing a plugin](#writing-a-plugin)
+- [Caching](#caching)
+- [Export and reload](#export-and-reload)
+- [Architecture](#architecture)
+- [Contributing](#contributing)
+
+---
+
+## Why
+
+Fetching "all the data over my area of interest" usually means juggling owslib, pystac-client, osmnx, raw REST calls, five different CRS conventions and as many output formats. GeoDataCatalog gives you:
+
+| Feature | Detail |
+|---|---|
+| **Multi-protocol** | WFS · WMS · WMTS · WCS · STAC · OSM · REST · Python plugins |
+| **100% YAML config** | add/modify providers without touching Python |
+| **Secrets via env vars** | `${MY_API_KEY}` resolved at load time, never stored in the file |
+| **Disk cache** | `diskcache` (SQLite + GeoTIFF), configurable TTL, SHA-256 keys |
+| **Parallel fetch** | `asyncio.gather` across layers, thread pool for sync clients |
+| **Multi-polygon AOI** | one sub-fetch per polygon, per-polygon time windows, merged results |
+| **Normalised output** | `GeoDataFrame` (vector) · `xarray.DataArray/Dataset` (raster) · `list[pystac.Item]` |
+| **Auto clip** | vector and raster results clipped to your AOI |
+| **WMS/WMTS legends** | RGBA → categorical band with a `legend` attribute |
+| **STAC tooling** | cloud filter (metadata or SCL-on-AOI), coverage threshold, band mapping, lazy load |
+| **Network resilience** | exponential-backoff retry on every provider |
+| **Visualisation** | `.explore()` Folium maps for vectors, rasters and STAC footprints/thumbnails |
+| **Zonal statistics** | `.compute_stats()` per polygon and per layer |
+| **Export / reload** | gpkg, geojson, shp, GeoTIFF, NetCDF — and `from_files()` to reload |
+
+## Installation
+
+GDAL-based libraries are easiest to install through conda:
+
+```bash
+conda env create -f environment.yml
+conda activate geodatacatalog
+```
+
+Or with pip (requires GDAL/PROJ available on your system):
+
+```bash
+pip install geodatacatalog            # core
+pip install "geodatacatalog[all]"     # + folium, ipywidgets, osmnx, netcdf, jupyter
+```
+
+For development:
+
+```bash
+git clone https://github.com/<you>/geodatacatalog
+cd geodatacatalog
+pip install -e ".[all,dev]"
+pytest
+```
+
+## Quickstart
+
+```python
+import logging
+import geopandas as gpd
+from geodatacatalog import load_catalog, GeoRequest
+
+logging.basicConfig(level=logging.INFO)
+
+# 1. Load the catalog and inspect available layers
+catalog = load_catalog("catalog.yml")
+catalog.info()                       # DataFrame: layer_id · provider · type · kind · url
+
+# 2. Describe what you want — once, for every provider
+aoi = gpd.read_file("my_area.geojson")
+request = GeoRequest(
+    aoi_gdf=aoi,                     # bbox derived automatically, results clipped
+    crs="EPSG:2154",
+    resolution=10,                   # metres / pixel
+    datetime="2024-06-01/2024-08-31",
+)
+
+# 3. Fetch
+results = catalog.fetch(request, layers=[
+    "ign__communes",
+    "soilgrids_clay__clay_0_5cm",
+    "earth_search__S2_L2A",
+])
+print(results)
+# CatalogResults (3 layers):
+#   ign__communes              : GeoDataFrame (142 rows)
+#   soilgrids_clay__clay_0_5cm : DataArray {'band': 1, 'y': 128, 'x': 128}
+#   earth_search__S2_L2A       : list[Item] (8)
+
+# 4. Visualise, load imagery, export
+results.explore()
+results.load("earth_search__S2_L2A", bands=["red", "green", "blue", "nir"])
+results.export("./output")
+```
+
+In Jupyter, pick layers interactively:
+
+```python
+sel = catalog.select_layers(kind="VECTOR")    # checkbox widget
+results = catalog.fetch(request, layers=sel.get())
+```
+
+## GeoRequest — the unified request
+
+Every provider receives the same request object.
+
+```python
+request = GeoRequest(
+    bbox=(-2.5, 43.0, 2.5, 45.5),    # EPSG:4326, or derive it from aoi_gdf
+    aoi_gdf=aoi,                     # GeoDataFrame: enables clipping & multi-polygon
+    crs="EPSG:2154",                 # target CRS of the results
+    resolution=10,                   # m/pixel (auto-derived from bbox when omitted)
+    datetime="2024-06-01/2024-08-31",
+    cloud_cover=15,                  # max cloud % (overrides the layer setting)
+    bands=["red", "nir"],            # STAC bands
+    max_features=5000,               # vector cap
+    zoom=14,                         # force WMTS/XYZ zoom
+)
+request.explore()                    # show AOI + bbox on a map
+```
+
+**Multi-polygon AOIs.** If `aoi_gdf` has several rows, `fetch` runs one sub-request per polygon (bounded concurrency) and returns a multi-polygon `CatalogResults`. A `datetime` column in the GeoDataFrame sets a per-polygon time window — handy for event-based analysis (one date per site). An `id`/`fid`/`uid` column becomes the `polygon_id`.
+
+## CatalogResults — working with results
+
+`fetch()` returns a `CatalogResults`: dict-like access plus a fluent API.
+
+```python
+gdf   = results["ign__communes"]            # GeoDataFrame
+da    = results["ign_wmts__foret"]          # xarray.DataArray
+items = results["earth_search__S2_L2A"]     # list[pystac.Item]
+
+results.explore()                           # all layers on one Folium map
+results.sel("ign_wmts__foret").explore()    # a single layer
+results.compute_stats()                     # per-polygon zonal statistics
+results.export("./output", formats={"ign__communes": "gpkg"})
+```
+
+Multi-polygon mode:
+
+```python
+results[0]                  # CatalogResults of the first polygon
+results["layer_id"]         # that layer across all polygons (list)
+results.sel("layer_id")     # filter every polygon down to one layer
+results.compute_stats()     # one row per polygon
+```
+
+## The STAC workflow
+
+STAC layers return raw `pystac.Item`s — inspect, filter, sort, *then* download:
+
+```python
+sel = results.sel("earth_search__S2_L2A")
+sel                                          # items with date, cloud %, coverage %
+
+(results
+    .sort(by="cloud_cover")                  # or "datetime", "coverage"
+    .filter(coverage=100)                    # full AOI coverage only
+    .first()                                 # keep the best item
+    .load(bands=["red", "green", "blue"]))   # odc-stac → xr.Dataset, clipped to AOI
+```
+
+Useful config knobs (per product, in `catalog.yml`):
+
+- `cloudCover`: filter on the `eo:cloud_cover` metadata.
+- `cloudCoverAoi`: compute the *actual* cloud fraction over your AOI from the SCL band (slower, much more accurate).
+- `imageCoverageThreshold`: discard items covering less than N % of the AOI.
+- `bandMapping`: map provider asset names to common band names, so `bands=["red","nir"]` works identically on every provider.
+
+## Configuration (catalog.yml)
+
+```yaml
+provider_name:
+    search:
+        type: StacSearch        # StacSearch | WFS | WMS | WMTS | WCS | REST | OSMNX | XYZ | <plugin>.py
+        api_endpoint: https://...
+        need_auth: false        # true → provider skipped when credentials are missing
+    auth:
+        credentials:
+            api_key: ${MY_API_KEY}      # ${VAR} / ${VAR:-default} resolved from the environment
+    products:
+        my_product:
+            productType: <remote identifier>
+            description: Human readable description
+            static: true        # no time dimension → datetime filter skipped
+```
+
+Layer ids are `{provider_name}__{product_id}`. The format is inspired by [EODAG](https://github.com/CS-SI/eodag) provider files.
+
+**Setting the secrets.** Copy [.env.example](.env.example) to `.env` (gitignored), fill in your keys, and load it:
+
+```bash
+cp .env.example .env
+set -a && source .env && set +a       # bash / zsh
+```
+
+or from Python/Jupyter, before `load_catalog()`:
+
+```python
+from dotenv import load_dotenv        # pip install python-dotenv
+load_dotenv()
+```
+
+Providers whose variables are unset are skipped with a warning; everything else keeps working.
+
+**Authentication patterns:**
+
+```yaml
+auth:
+    credentials:
+        api_key: ${KEY}          # → x-api-key header
+        # token: ${TOKEN}        # → Authorization: Bearer
+        # username: ${USER}      # → Authorization: Basic
+        # password: ${PASS}
+
+# S3-backed STAC (e.g. Copernicus Data Space):
+auth:
+    type: AwsAuth
+    s3_endpoint: eodata.dataspace.copernicus.eu
+    credentials:
+        aws_access_key_id: ${CDSE_S3_ACCESS_KEY}
+        aws_secret_access_key: ${CDSE_S3_SECRET_KEY}
+
+# Public S3 buckets:
+auth:
+    no-sign-request: true
+```
+
+## Bundled providers
+
+The default [`catalog.yml`](catalog.yml) ships ~40 layers, oriented towards French and European open data:
+
+| Provider | Type | Data | Auth |
+|---|---|---|---|
+| `earth_search` | STAC | Sentinel-2 L2A, Sentinel-1 GRD, Landsat C2L2, Copernicus DEM | — |
+| `cop_dataspace` | STAC | Sentinel-2 L2A, Sentinel-5P NO₂ (official ESA archive) | env vars for download |
+| `geodes` | STAC | THEIA OSO land cover, LAI (CNES) | `GEODES_API_KEY` |
+| `ign` | WFS | communes, départements, buildings, roads, railways, rivers, forest, cadastre, agricultural parcels (RPG), ZNIEFF, Natura 2000, parks | — |
+| `ign_wmts` | WMTS | orthophotos, Plan IGN, BD Forêt v2 (legend), Corine Land Cover 2018 (legend) | — |
+| `brgm` | WFS | geological faults 1:1M | — |
+| `sandre` | WFS | water bodies & watercourses (BD Topage) | — |
+| `hubeau` / `hubeau_nappes` | REST | real-time hydrometry, groundwater piezometers | — |
+| `effis` | WMS | Fire Weather Index, fuel map (Copernicus) | — |
+| `soilgrids_*` | WCS | sand / clay / organic carbon 0-5 cm (ISRIC, global) | — |
+| `gebco` | WMS | global bathymetry | — |
+| `openstreetmap` | OSMNX | road network, water bodies | — |
+
+Providers with missing credentials are simply skipped at load time — the rest of the catalog still works.
+
+## REST APIs (no plugin needed)
+
+The `REST` provider is config-driven and covers most bbox-filtered JSON APIs — templated query parameters plus optional pagination, all from YAML. Example: GBIF species occurrences, which filter by coordinate *ranges* (not a single bbox param) and paginate:
+
+```yaml
+gbif:
+    search:
+        type: REST
+        api_endpoint: https://api.gbif.org/v1/occurrence/search
+        queryParam: scientificName       # productType → ?scientificName=...
+        dataKey: results                 # record list lives under this JSON key
+        lonField: decimalLongitude
+        latField: decimalLatitude
+        bboxParams:                      # templates: {minx} {miny} {maxx} {maxy} {bbox}
+            decimalLatitude: "{miny},{maxy}"
+            decimalLongitude: "{minx},{maxx}"
+        params: { hasCoordinate: "true" }
+        datetimeParam: year              # request.datetime → ?year=start,end
+        paginate: { offset_param: offset, limit_param: limit, page_size: 300,
+                    max_records: 5000, end_field: endOfRecords }
+    products:
+        gypaete_barbu: { productType: Gypaetus barbatus }
+```
+
+```python
+results = catalog.fetch(GeoRequest(bbox=(-5.5, 41, 9.8, 51.5),
+                                   datetime="2015-01-01/2025-12-31"),
+                        layers=["gbif__gypaete_barbu"])   # → GeoDataFrame of points
+```
+
+The simpler single-parameter form still works for APIs like Hub'Eau (`bbox_key: {key: bbox}`).
+
+## Writing a plugin
+
+For sources that fit no standard protocol *and no REST shape* (custom auth flows, binary formats, on-the-fly computation), drop a Python file next to your `catalog.yml` (or in `plugin_search_dirs`) exposing one function:
+
+```python
+# my_plugin.py
+def fetch(request, product_type, config):
+    """
+    request      : GeoRequest (bbox, datetime, crs, resolution, aoi_gdf, ...)
+    product_type : the productType string from the YAML
+    config       : the full provider config dict (auth, search, ...)
+
+    Return a GeoDataFrame, an xarray.DataArray/Dataset, or a list[pystac.Item].
+    """
+```
+
+```yaml
+my_provider:
+    search:
+        type: my_plugin.py
+        api_endpoint: https://example.com/api
+    products:
+        my_product:
+            productType: some-identifier
+```
+
+A complete commented template (vector + raster examples) lives in [examples/plugin_template.py](examples/plugin_template.py) — it is exercised by the test suite, fully offline.
+
+For deeper integration (custom caching, async fetch), subclass `BaseLayer` and implement `_fetch_sync(request)` or override `fetch_async(...)`; then register it with `catalog.add_layer(...)`.
+
+## Exploring new sources
+
+The `geodatacatalog` CLI (the *explorer* sub-project) ships a curated, health-checked registry of **~90 open geospatial services** — see [SOURCES.md](SOURCES.md). It takes you from "where can I find X?" to a working `catalog.yml`:
+
+```bash
+# Discover & configure sources (operate on the source registry)
+geodatacatalog search "forêt"                 # FR/EN thematic search
+geodatacatalog check                          # probe every service, update SOURCES.md
+geodatacatalog layers ign_wfs --grep commune  # list the layers of a source
+geodatacatalog discover eea_sdi "land cover"  # search a CSW meta-catalogue for services
+geodatacatalog add herault_dfci ns:pistes --type WFS --endpoint <url> -o catalog.yml  # ad-hoc service
+geodatacatalog preview gebco GEBCO_LATEST --open      # Folium preview on a small bbox
+geodatacatalog add gebco GEBCO_LATEST -o catalog.yml  # generate/merge a catalog.yml
+geodatacatalog init-catalog --theme soil -o soil.yml  # full catalog from a theme
+
+# Use a catalog.yml (operate on your config)
+geodatacatalog info catalog.yml                                   # list its layers
+geodatacatalog fetch catalog.yml -l ign__communes --bbox 1.4,43.5,1.5,43.6 \
+                     -o out --explore map.html --open             # download + map
+```
+
+Generated catalogs are validated with `load_catalog()` before being written. The registry lives in [geodatacatalog/explorer/sources.yml](geodatacatalog/explorer/sources.yml) — PRs adding open sources are welcome.
+
+A natural-language assistant (French or English) helps you find data **and** configure it. It uses real tools — it queries a source's live layer list to find the exact `productType`, then asks the library to generate a validated `catalog.yml` block and the exact CLI command (no invented flags, no hand-written YAML). Set `MISTRAL_API_KEY` (free tier at [console.mistral.ai](https://console.mistral.ai), nothing to install) or `ANTHROPIC_API_KEY` (with `pip install "geodatacatalog[ai]"`):
+
+```bash
+export MISTRAL_API_KEY=...
+geodatacatalog chat "je veux des observations de gypaète barbu en France"
+# · list_layers(source_id='gbif', grep='occurrence')
+# · make_catalog_entry(source_id='gbif', layers=['Gypaetus barbatus'])
+# → the YAML block + `geodatacatalog add gbif "Gypaetus barbatus" -o catalog.yml`
+```
+
+Walkthrough notebook: [examples/explore_sources.ipynb](examples/explore_sources.ipynb).
+
+## Caching
+
+Every fetch is cached on disk (`diskcache`, SQLite index; rasters stored as GeoTIFF). The key hashes `layer_id + bbox + crs + resolution + datetime + bands + cloud_cover + filters + zoom`.
+
+```python
+catalog = load_catalog("catalog.yml",
+                       cache_dir="./geo_cache",
+                       cache_ttl=86400 * 7)      # 7 days
+
+catalog.fetch(request, no_cache=True)            # bypass for one call
+catalog.clear_cache("ign__communes")             # or clear_cache() for everything
+```
+
+To diagnose performance, a profiling script is included:
+
+```bash
+python scripts/profile_fetch.py catalog.yml -l ign__communes --aoi zones.geojson
+```
+
+## Export and reload
+
+```python
+results.export("./output")                       # geojson for vectors, GeoTIFF for rasters
+results.export("./output", formats={
+    "ign__communes": "gpkg",
+    "earth_search__S2_L2A": "nc",
+})
+
+# Later — rebuild a CatalogResults from the exported files
+results = catalog.from_files("./output")         # request restored from _request.json
+results.compute_stats()
+```
+
+## Architecture
+
+```
+catalog.yml ──▶ load_catalog() ──▶ GeoDataCatalog
+                                      │ .fetch(GeoRequest) · .info() · .select_layers()
+                                      │
+                          asyncio.gather + aiohttp + diskcache
+                                      │
+       ┌──────────┬─────────┬─────────┼─────────┬─────────┬────────┐
+    WFSLayer  WMSLayer  WMTSLayer  WCSLayer  STACLayer  RESTLayer  ...
+       │          │         │         │         │          │
+  GeoDataFrame DataArray DataArray DataArray list[Item] GeoDataFrame
+       └──────────┴─────────┴─────────┴─────────┴──────────┘
+                                      │
+                              CatalogResults
+                .explore() · .load() · .sel/.sort/.filter/.first()
+                .export() · .from_files() · .compute_stats()
+```
+
+Package layout:
+
+```
+geodatacatalog/
+├── request.py        # GeoRequest — the unified request
+├── base.py           # BaseLayer, LayerKind, LayerResult, retry
+├── catalog.py        # GeoDataCatalog (fetch orchestration, cache, widgets)
+├── results.py        # CatalogResults (fluent API, export, stats)
+├── config.py         # load_catalog() — YAML + env-var interpolation
+├── viz.py            # Folium rendering
+├── utils.py          # legends, raster export, GeoJSON helpers
+└── layers/           # one module per protocol (wfs, wms, wmts, wcs, stac,
+                      #   rest, osmnx, xyz, local, plugin)
+```
+
+## Contributing
+
+Issues and pull requests are welcome. To add a provider to the default catalog, edit `catalog.yml` — please stick to **open, account-free** sources or document the required environment variables. Run `pytest` (offline-safe) before submitting.
+
+## License
+
+[MIT](LICENSE)

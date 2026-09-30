@@ -1,0 +1,60 @@
+# Conda environment for geodatacatalog (chat + full geo stack).
+#
+# Create:   conda env create -f environment.yml        (or: mamba env create -f environment.yml)
+# Update:   conda env update -f environment.yml --prune
+# Rebuild:  conda env remove -n geodatacatalog -y && conda env create -f environment.yml
+#
+# The whole geo/binary stack comes from conda-forge for ABI consistency: GEOS >= 3.13
+# (so shapely.remove_repeated_points works) and GDAL (so pyogrio/fiona power geopandas
+# IO). Installing these via conda — NOT pip — avoids the wheel/ABI clashes that break
+# read_file or raise UnsupportedGEOSVersionError. Pip only links the editable package;
+# its dependencies are already satisfied by conda, so nothing geo gets rebuilt.
+name: geodatacatalog
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - geos>=3.13
+  # --- core (matches pyproject [project].dependencies) ---
+  - geopandas
+  - shapely>=2.0
+  - pyproj
+  - pyogrio
+  - fiona
+  - rasterio
+  - rioxarray
+  - xarray
+  - pandas
+  - numpy
+  - odc-stac
+  - pystac
+  - pystac-client
+  - owslib
+  - aiohttp
+  - diskcache
+  - pillow
+  - pyyaml
+  - requests
+  # --- optional extras: viz / ai / jupyter / netcdf / s3 / osm ---
+  - folium
+  - ipywidgets
+  - nest-asyncio
+  - netcdf4
+  - h5netcdf
+  - fsspec
+  - s3fs
+  - odc-algo
+  - boto3
+  - osmnx
+  - rich
+  - questionary
+  - anthropic
+  - spyndex
+  - pyarrow
+  # --- dev ---
+  - pytest
+  - ruff
+  # --- the package itself (editable; run from the repo root) ---
+  - pip
+  - pip:
+      - -e .

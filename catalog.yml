@@ -1,0 +1,760 @@
+earth_search:
+  search:
+    type: StacSearch
+    api_endpoint: https://earth-search.aws.element84.com/v1/search
+    need_auth: false
+  auth:
+    no-sign-request: true
+  products:
+    S2_L2A:
+      productType: sentinel-2-l2a
+      description: Sentinel-2 L2A surface reflectance (10 m, COG)
+      cloudCover: 100
+      bandMapping:
+      - aot: aerosol
+      - coastal: coastal
+      - blue: blue
+      - green: green
+      - red: red
+      - rededge1: rededge071
+      - rededge2: rededge074
+      - rededge3: rededge078
+      - nir: nir
+      - nir08: nir08
+      - nir09: nir09
+      - swir16: swir16
+      - swir22: swir22
+      - scl: scl
+      - wvp: wvp
+      - visual: tci
+      - thumbnail: thumbnail
+    S1_GRD:
+      productType: sentinel-1-grd
+      description: 'Sentinel-1 SAR GRD (VV/VH backscatter). NEEDS AUTH: data is in the requester-pays s3://sentinel-s1-l1c
+        bucket (AWS creds + requester-pays, egress billed) — for a free alternative use cop_dataspace.S1_GRD.'
+      bandMapping:
+      - vh: grd_c_vh
+      - vv: grd_c_vv
+      - thumbnail: thumbnail
+    LANDSAT_C2L2:
+      productType: landsat-c2-l2
+      description: 'Landsat Collection 2 Level-2 surface reflectance (30 m). NEEDS AUTH: data is in the requester-pays
+        s3://usgs-landsat bucket (AWS creds + requester-pays, egress billed).'
+      bandMapping:
+      - coastal: coastal
+      - blue: blue
+      - green: green
+      - red: red
+      - nir08: nir08
+      - swir16: swir16
+      - swir22: swir22
+      - lwir11: lwir11
+      - qa_pixel: qa_pixel
+      - thumbnail: thumbnail
+    COP_DEM_GLO30:
+      productType: cop-dem-glo-30
+      description: Copernicus global DEM (30 m)
+      static: true
+      bandMapping:
+      - data: data
+    sentinel_2_l2a:
+      productType: sentinel-2-l2a
+      description: Global Sentinel-2 data from the Multispectral Instrument (MSI) onboard Sentinel-2
+cop_dataspace:
+  search:
+    type: StacSearch
+    api_endpoint: https://stac.dataspace.copernicus.eu/v1/search
+    need_auth: true
+  auth:
+    type: AwsAuth
+    s3_endpoint: eodata.dataspace.copernicus.eu
+    https: true
+    virtual_hosting: false
+    gdal_unsafe_ssl: true
+    credentials:
+      aws_access_key_id: ${CDSE_S3_ACCESS_KEY}
+      aws_secret_access_key: ${CDSE_S3_SECRET_KEY}
+      region_name: default
+  products:
+    S2_L2A:
+      productType: sentinel-2-l2a
+      description: Sentinel-2 L2A from the official ESA archive
+      bandMapping:
+      - AOT_10m: aerosol
+      - B01_20m: coastal
+      - B02_10m: blue
+      - B03_10m: green
+      - B04_10m: red
+      - B05_20m: rededge071
+      - B06_20m: rededge075
+      - B07_20m: rededge078
+      - B08_10m: nir
+      - B8A_20m: nir08
+      - B09_60m: nir09
+      - B11_20m: swir16
+      - B12_20m: swir22
+      - WVP_10m: wvp
+      - SCL_20m: scl
+      - TCI_10m: tci
+      - thumbnail: thumbnail
+    S1_GRD:
+      productType: sentinel-1-grd
+      description: Sentinel-1 SAR GRD (VV/VH backscatter) from the official ESA archive (COG)
+      bandMapping:
+      - vh: grd_c_vh
+      - vv: grd_c_vv
+      - thumbnail: thumbnail
+    S5P_NO2:
+      productType: sentinel-5p-l2-no2-offl
+      description: Sentinel-5P tropospheric NO2 (air quality)
+      bandMapping:
+      - netcdf: no2
+    sentinel_2_l2a:
+      productType: sentinel-2-l2a
+      description: 'The Sentinel-2 Level-2A Collection 1 product provides orthorectified Surface Reflectance (Bottom-Of-Atmosphere:
+        BOA), with sub-pixel multispectral and multitemporal registration accuracy. Scene Classification (including
+        Clouds and Cloud Shadows), AOT (Aerosol Optical Thickness) and WV (Water Vapour) maps are included in the
+        product.'
+geodes:
+  search:
+    type: StacSearch
+    api_endpoint: https://geodes-portal.cnes.fr/api/stac/search
+    need_auth: true
+  auth:
+    credentials:
+      apikey: ${GEODES_API_KEY}
+  products:
+    OSO_LAND_COVER:
+      productType: THEIA_OSO_VECTOR_L3B
+      description: OSO land cover map of France (CESBIO/THEIA)
+      static: true
+    VEGETATION_LAI:
+      productType: THEIA_POSTEL_VEGETATION_LAI
+      description: Leaf Area Index (THEIA/POSTEL)
+      static: true
+ign:
+  search:
+    type: WFS
+    api_endpoint: https://data.geopf.fr/wfs/ows
+    need_auth: false
+  products:
+    communes:
+      productType: ADMINEXPRESS-COG.LATEST:commune
+      description: French communes (administrative boundaries)
+      static: true
+    departements:
+      productType: ADMINEXPRESS-COG.LATEST:departement
+      description: French départements
+      static: true
+    batiments:
+      productType: BDTOPO_V3:batiment
+      description: Buildings (BD TOPO)
+      static: true
+    routes:
+      productType: BDTOPO_V3:troncon_de_route
+      description: Road segments (BD TOPO, includes tracks and paths)
+      static: true
+    voies_ferrees:
+      productType: BDTOPO_V3:troncon_de_voie_ferree
+      description: Railway segments (BD TOPO)
+      static: true
+    cours_eau:
+      productType: BDCARTO_V5:cours_d_eau
+      description: Rivers and streams (BD CARTO)
+      static: true
+    vegetation:
+      productType: BDTOPO_V3:zone_de_vegetation
+      description: Vegetation zones (BD TOPO)
+      static: true
+    foret:
+      productType: LANDCOVER.FORESTINVENTORY.V2:formation_vegetale
+      description: Forest inventory BD Forêt v2 (vector)
+      static: true
+    parcelles_cadastrales:
+      productType: CADASTRALPARCELS.PARCELLAIRE_EXPRESS:parcelle
+      description: Cadastral parcels
+      static: true
+    rpg_parcelles:
+      productType: RPG.2023:parcelles_graphiques
+      description: Agricultural parcels and crops (RPG 2023, CAP declarations)
+      static: true
+    znieff1:
+      productType: patrinat_znieff1:znieff1
+      description: ZNIEFF type 1 ecological inventory zones
+      static: true
+    natura2000_habitats:
+      productType: patrinat_sic:sic
+      description: Natura 2000 sites (EU Habitats Directive)
+      static: true
+    parcs_naturels_regionaux:
+      productType: patrinat_pnr:pnr
+      description: French regional natural parks
+      static: true
+    parcs_nationaux:
+      productType: patrinat_pn:parc_national
+      description: French national parks
+      static: true
+ign_wmts:
+  search:
+    type: WMTS
+    api_endpoint: https://data.geopf.fr/wmts
+    need_auth: false
+  products:
+    ortho:
+      productType: ORTHOIMAGERY.ORTHOPHOTOS
+      description: IGN aerial orthophotos (20 cm)
+      tileMatrixSet: PM
+      format: image/jpeg
+      static: true
+    plan:
+      productType: GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2
+      description: Plan IGN v2 basemap
+      tileMatrixSet: PM
+      format: image/png
+      static: true
+    foret:
+      productType: LANDCOVER.FORESTINVENTORY.V2
+      description: BD Forêt v2 forest types (~25 m raster)
+      tileMatrixSet: PM_6_16
+      format: image/png
+      static: true
+      legend:
+        '#e5c45d': Forêt fermée sans couvert arboré
+        '#00931b': Forêt fermée à mélange de feuillus
+        '#017838': Forêt fermée de feuillus purs en îlots
+        '#004d2e': Forêt fermée de chênes décidus purs
+        '#668040': Forêt fermée de chênes sempervirents purs
+        '#00ff80': Forêt fermée de hêtre pur
+        '#40ff26': Forêt fermée de châtaignier pur
+        '#915633': Forêt fermée de robinier pur
+        '#afca59': Forêt fermée d'un autre feuillu pur
+        '#00d92f': Forêt fermée à mélange de feuillus
+        '#8080ff': Forêt fermée de conifères purs en îlots
+        '#bf26ff': Forêt fermée de pin maritime pur
+        '#9926ff': Forêt fermée de pin sylvestre pur
+        '#0000ff': Forêt fermée de pin laricio ou pin noir pur
+        '#ff1aff': Forêt fermée de pin d'Alep pur
+        '#734de6': Forêt fermée de pin à crochets ou pin cembro pur
+        '#a666ff': Forêt fermée d'un autre pin pur
+        '#ff99ff': Forêt fermée à mélange de pins purs
+        '#1ae6e6': Forêt fermée de sapin ou épicéa
+        '#66b2ff': Forêt fermée de mélèze pur
+        '#3399ff': Forêt fermée de douglas pur
+        '#01929f': Forêt fermée à mélange d'autres conifères
+        '#53ecec': Forêt fermée d'un autre conifère pur autre que pin
+        '#404dff': Forêt fermée à mélange de conifères
+        '#ff9833': Forêt fermée à mélange de feuillus prépondérants et conifères
+        '#ff4033': Forêt fermée à mélange de conifères prépondérants et feuillus
+        '#b3b3b3': Forêt ouverte sans couvert arboré
+        '#ccffbf': Forêt ouverte de feuillus purs
+        '#99b3cc': Forêt ouverte de conifères purs
+        '#ffd138': Forêt ouverte à mélange de feuillus et conifères
+        '#ffff00': Peupleraie
+        '#ffe6bf': Lande
+        '#ffffb9': Formation herbacée
+    corine_land_cover:
+      productType: LANDCOVER.CLC18
+      description: Corine Land Cover 2018 (EU land cover, 100 m)
+      tileMatrixSet: PM
+      format: image/png
+      static: true
+      legend:
+        '#e6004d': Tissu urbain continu
+        '#ff0000': Tissu urbain discontinu
+        '#cc4df2': Zones industrielles ou commerciales
+        '#cc0000': Réseaux routier et ferroviaire
+        '#e6cccc': Zones portuaires
+        '#e6cce6': Aéroports
+        '#a600cc': Extraction de matériaux
+        '#a64dcc': Décharges
+        '#ff4dff': Chantiers
+        '#ffa6ff': Espaces verts urbains
+        '#ffe6ff': Équipements sportifs et de loisirs
+        '#ffffa8': Terres arables hors périmètres irrigués
+        '#ffff00': Périmètres irrigués en permanence
+        '#e6e600': Rizières
+        '#e68000': Vignobles
+        '#f2a64d': Vergers et petits fruits
+        '#e6a600': Prairies et autres surfaces toujours en herbe
+        '#e6e64d': Cultures annuelles associées aux cultures permanentes
+        '#ffe6a6': Systèmes culturaux et parcellaires complexes
+        '#ffe64d': Surfaces essentiellement agricoles interrompues par des espaces naturels
+        '#e6cc4d': Forêts et végétation arbustive en mutation
+        '#f2cca6': Forêts de feuillus
+        '#80ff00': Forêts de conifères
+        '#00a600': Forêts mélangées
+        '#4dff00': Pelouses et pâturages naturels
+        '#ccf24d': Landes et broussailles
+        '#a6ff80': Végétation sclérophylle
+        '#a6e64d': Forêt et végétation arbustive en mutation
+        '#e6e6e6': Plages, dunes et sable
+        '#cccccc': Roches nues
+        '#ccffcc': Végétation clairsemée
+        '#000000': Zones incendiées
+        '#a6e6cc': Glaciers et neiges éternelles
+        '#e6f2ff': Marais intérieurs
+        '#7ba6ff': Tourbières
+        '#00ccf2': Marais maritimes
+        '#00ffa6': Marais salants
+        '#a6a6ff': Zones intertidales
+        '#4d4dff': Cours et voies d'eau
+        '#ccccff': Plans d'eau
+        '#0000a6': Lagunes littorales
+        '#80f2e6': Estuaires
+        '#00ffc8': Mers et océans
+brgm:
+  search:
+    type: WFS
+    api_endpoint: http://mapsref.brgm.fr/wxs/1GG/BRGM_1M_INSPIRE_geolUnits_geolFaults
+    need_auth: false
+  products:
+    failles:
+      productType: gmlsp:GE_GeologicFault_BRGM_EN_1M_Surface
+      description: Geological faults of France (1:1M)
+      static: true
+sandre:
+  search:
+    type: WFS
+    api_endpoint: https://services.sandre.eaufrance.fr/geo/sandre
+    need_auth: false
+  products:
+    plans_eau:
+      productType: sa:PlanEau_FXX_Topage2025
+      description: Water bodies of metropolitan France (BD Topage)
+      static: true
+    cours_eau:
+      productType: sa:CoursEau_FXX_Topage2025
+      description: Watercourses of metropolitan France (BD Topage)
+      static: true
+hubeau:
+  search:
+    type: REST
+    api_endpoint: https://hubeau.eaufrance.fr/api/v2
+    need_auth: false
+    bbox_key:
+      key: bbox
+  products:
+    hydrometrie:
+      productType: hydrometrie/observations_tr
+      description: Real-time river flow and water level observations
+hubeau_nappes:
+  search:
+    type: REST
+    api_endpoint: https://hubeau.eaufrance.fr/api/v1
+    need_auth: false
+    bbox_key:
+      key: bbox
+  products:
+    piezometres:
+      productType: niveaux_nappes/stations
+      description: Groundwater level monitoring stations (piezometers)
+      lonField: x
+      latField: y
+gbif:
+  search:
+    type: REST
+    api_endpoint: https://api.gbif.org/v1/occurrence/search
+    need_auth: false
+    queryParam: scientificName
+    dataKey: results
+    lonField: decimalLongitude
+    latField: decimalLatitude
+    bboxParams:
+      decimalLatitude: '{miny},{maxy}'
+      decimalLongitude: '{minx},{maxx}'
+    params:
+      hasCoordinate: 'true'
+      hasGeospatialIssue: 'false'
+    datetimeParam: year
+    paginate:
+      offset_param: offset
+      limit_param: limit
+      page_size: 300
+      max_records: 5000
+      end_field: endOfRecords
+  products:
+    gypaete_barbu:
+      productType: Gypaetus barbatus
+      description: Bearded vulture occurrences (GBIF)
+    aigle_royal:
+      productType: Aquila chrysaetos
+      description: Golden eagle occurrences (GBIF)
+    Phoenicopterus_roseus:
+      productType: Phoenicopterus roseus
+      description: Species occurrences worldwide. productType = scientific name (e.g. Gypaetus barbatus)
+    Ciconia_ciconia:
+      productType: Ciconia ciconia
+      description: Species occurrences worldwide. productType = scientific name (e.g. Gypaetus barbatus)
+effis:
+  search:
+    type: WMS
+    api_endpoint: https://maps.effis.emergency.copernicus.eu/gwis
+    need_auth: false
+  products:
+    fire_weather_index:
+      productType: ecmwf.fwi
+      description: Fire Weather Index (ECMWF forecast)
+      format: image/tiff
+    fuel_map:
+      productType: fuel_map
+      description: Fuel map for fire risk assessment
+      format: image/tiff
+      static: true
+    mf010_fwi:
+      productType: mf010.fwi
+      description: mf010.fwi
+    mf010_ffmc:
+      productType: mf010.ffmc
+      description: mf010.ffmc
+    mf010_dmc:
+      productType: mf010.dmc
+      description: mf010.dmc
+    mf010_dc:
+      productType: mf010.dc
+      description: mf010.dc
+    mf010_isi:
+      productType: mf010.isi
+      description: mf010.isi
+    mf010_bui:
+      productType: mf010.bui
+      description: mf010.bui
+    modis_ba_2024:
+      productType: modis.ba.2024
+      description: modis.ba.2024
+soilgrids_sand:
+  search:
+    type: WCS
+    api_endpoint: https://maps.isric.org/mapserv?map=/map/sand.map
+    need_auth: false
+  products:
+    sand_0_5cm:
+      productType: sand_0-5cm_mean
+      description: Sand content 0-5 cm (g/kg)
+      static: true
+soilgrids_clay:
+  search:
+    type: WCS
+    api_endpoint: https://maps.isric.org/mapserv?map=/map/clay.map
+    need_auth: false
+  products:
+    clay_0_5cm:
+      productType: clay_0-5cm_mean
+      description: Clay content 0-5 cm (g/kg)
+      static: true
+soilgrids_soc:
+  search:
+    type: WCS
+    api_endpoint: https://maps.isric.org/mapserv?map=/map/soc.map
+    need_auth: false
+  products:
+    soc_0_5cm:
+      productType: soc_0-5cm_mean
+      description: Soil organic carbon 0-5 cm (dg/kg)
+      static: true
+gebco:
+  search:
+    type: WMS
+    api_endpoint: https://wms.gebco.net/mapserv
+    need_auth: false
+  products:
+    bathymetry:
+      productType: GEBCO_LATEST
+      description: GEBCO global bathymetry / terrain shaded relief
+      static: true
+openstreetmap:
+  search:
+    type: OSMNX
+    api_endpoint: https://nominatim.openstreetmap.org/search
+    need_auth: false
+  products:
+    roads:
+      productType: drive
+      description: OSM road network (graph edges)
+    water:
+      productType: features
+      tags:
+        natural: water
+      description: OSM water bodies (returned as centroids)
+ign_wfs:
+  search:
+    type: WFS
+    api_endpoint: https://data.geopf.fr/wfs/ows
+    need_auth: false
+  products:
+    BDTOPO_V3_bassin_versant_topographique:
+      productType: BDTOPO_V3:bassin_versant_topographique
+      description: BD TOPO, cadastre, RPG, ZNIEFF/Natura 2000, BD Forêt... (hundreds of layers)
+      static: true
+    BDCARTO_V5_bassin_versant_topographique:
+      productType: BDCARTO_V5:bassin_versant_topographique
+      description: BD TOPO, cadastre, RPG, ZNIEFF/Natura 2000, BD Forêt... (hundreds of layers)
+      static: true
+    BDTOPO_V3_batiment:
+      productType: BDTOPO_V3:batiment
+      description: Bâtiments − BDTOPO® V3 2026-03-15 ; Édition 2026-03-15
+      static: true
+    BDTOPO_V3_troncon_de_route:
+      productType: BDTOPO_V3:troncon_de_route
+      description: Tronçons de route − BDTOPO® V3 2026-03-15 ; Édition 2026-03-15
+      static: true
+    BDTOPO_V3_route_numerotee_ou_nommee:
+      productType: BDTOPO_V3:route_numerotee_ou_nommee
+      description: Routes numérotées et routes nommées − BDTOPO® V3 2026-03-15 ; Édition 2026-03-15
+      static: true
+    LIMITES_ADMINISTRATIVES_EXPRESS_LATEST_departement:
+      productType: LIMITES_ADMINISTRATIVES_EXPRESS.LATEST:departement
+      description: ADMIN EXPRESS mises a jour en continu - département ; Édition 2026-03-24
+      static: true
+    GEOGRAPHICALGRIDSYSTEM_DFCI_carro_dfci_1x1_l93:
+      productType: GEOGRAPHICALGRIDSYSTEM.DFCI:carro_dfci_1x1_l93
+      description: Carroyages DFCI 1x1 ; Édition 2016-04-01
+      static: true
+    IGNF_ACCESSIBILITE_PHYSIQUE_FORETS_acces_porteur:
+      productType: IGNF_ACCESSIBILITE-PHYSIQUE-FORETS-:acces_porteur
+      description: Ce jeu de données présente une cartographie de l’accessibilité physique des forêts aux engins
+        d’exploitation, produite par l’IGN à partir de la méthodologie développée dans le cadre du projet ACCESSFOR.
+        Il permet d’identifier les zones forestières accessibles ou non accessibles aux principaux engins d’exploitation
+        ; Édition 2025-01-01
+      static: true
+    IGNF_ACCESSIBILITE_PHYSIQUE_FORETS_acces_skidder:
+      productType: IGNF_ACCESSIBILITE-PHYSIQUE-FORETS-:acces_skidder
+      description: Ce jeu de données présente une cartographie de l’accessibilité physique des forêts aux engins
+        d’exploitation, produite par l’IGN à partir de la méthodologie développée dans le cadre du projet ACCESSFOR.
+        Il permet d’identifier les zones forestières accessibles ou non accessibles aux principaux engins d’exploitation
+        ; Édition 2025-01-01
+      static: true
+    BDTOPO_V3_point_d_acces:
+      productType: BDTOPO_V3:point_d_acces
+      description: Points d'accès − BDTOPO® V3 2026-03-15 ; Édition 2026-03-15
+      static: true
+    BDTOPO_V3_equipement_de_transport:
+      productType: BDTOPO_V3:equipement_de_transport
+      description: Équipements de transport − BDTOPO® V3 2026-03-15 ; Édition 2026-03-15
+      static: true
+    BDTOPO_V3_transport_par_cable:
+      productType: BDTOPO_V3:transport_par_cable
+      description: Transports par câble − BDTOPO® V3 2026-03-15 ; Édition 2026-03-15
+      static: true
+    BDTOPO_V3_foret_publique:
+      productType: BDTOPO_V3:foret_publique
+      description: Forêts publiques − BDTOPO® V3 2026-03-15 ; Édition 2026-03-15
+      static: true
+    IGNF_MASQUE_FORET_2021_2023_masque_foret:
+      productType: IGNF_MASQUE-FORET.2021-2023:masque_foret
+      description: Le Masque Forêt V1 permet de localiser les surfaces de forêt présentes en France métropolitaine.
+        Il contient également une information sur l’usage des forêts ; Édition 2023-01-01
+      static: true
+    DEPARTEMENT:
+      productType: DEPARTEMENT
+      description: BD TOPO, cadastre, RPG, ZNIEFF/Natura 2000, BD Forêt... (hundreds of layers)
+      static: true
+digitraffic_marine:
+  search:
+    type: REST
+    api_endpoint: https://meri.digitraffic.fi/api
+    need_auth: false
+  products:
+    ais_v1_locations:
+      productType: ais/v1/locations
+      description: Open Baltic/Finnish AIS vessel traffic. Returns a GeoJSON FeatureCollection (geometry, not flat
+        lon/lat), so it needs GeoJSON parsing. The server requires an Accept-Encoding gzip header.
+opensky:
+  search:
+    type: opensky.py
+    api_endpoint: https://opensky-network.org/api
+    need_auth: false
+  products:
+    states_all:
+      productType: states/all
+      description: Live aircraft positions. Responses are positional ARRAYS (state vectors), so the shipped opensky.py
+        plugin maps them to points (states/all). Anonymous access is rate-limited; a free OpenSky account (auth.credentials
+        username/password) raises the limits.
+    states:
+      productType: states
+      description: Live aircraft positions. Responses are positional ARRAYS (state vectors), so the shipped opensky.py
+        plugin maps them to points (states/all). Anonymous access is rate-limited; a free OpenSky account (auth.credentials
+        username/password) raises the limits.
+sentinelhub:
+  search:
+    type: geodata_sentinelhubapi.py
+    api_endpoint: https://sh.dataspace.copernicus.eu/api/v1/process
+    need_auth: true
+  auth:
+    credentials:
+      client_id: ${SH_CDSE_CLIENT_ID}
+      client_secret: ${SH_CDSE_CLIENT_SECRET}
+  products:
+    ndvi:
+      productType: NDVI
+      description: NDVI (vegetation index) — spyndex formula on Sentinel-2 L2A, SCL cloud-masked
+    nbr:
+      productType: NBR
+      description: NBR (normalized burn ratio) — spyndex index
+    dnbr:
+      productType: dNBR
+      description: dNBR (burn severity) — NBR difference between the two ends of the datetime range (NBR[date2]
+        - NBR[date1], each composited over ~30 days); works for any index (dBAI, dNDVI...)
+    b08_nir:
+      productType: B08
+      description: Sentinel-2 band B08 (NIR, 10 m) surface reflectance
+    NDMI:
+      productType: NDMI
+      description: THE source for named spectral INDICES — any spyndex Sentinel-2 index (NDVI, NDMI, NBR, NDWI,
+        EVI, SAVI...) — and single BANDS (B01-B12), computed on the fly from Sentinel-2 L2A (SCL cloud-masked) via
+        the geodata_sentinelhubapi.py plugin. productType = the index/band name. STAC collections only expose RAW
+        bands, not named indices — use THIS for an index. Needs CDSE_CLIENT_ID/CDSE_CLIENT_SECRET.
+    MSI:
+      productType: MSI
+      description: THE source for named spectral INDICES — any spyndex Sentinel-2 index (NDVI, NDMI, NBR, NDWI,
+        EVI, SAVI...) — and single BANDS (B01-B12), computed on the fly from Sentinel-2 L2A (SCL cloud-masked) via
+        the geodata_sentinelhubapi.py plugin. productType = the index/band name. STAC collections only expose RAW
+        bands, not named indices — use THIS for an index. Needs CDSE_CLIENT_ID/CDSE_CLIENT_SECRET.
+    NBR:
+      productType: NBR
+      description: NBR — Normalized Burn Ratio
+gdacs:
+  search:
+    type: REST
+    api_endpoint: https://www.gdacs.org/gdacsapi
+    need_auth: false
+  products:
+    api_events_geteventlist_MAP:
+      productType: api/events/geteventlist/MAP
+planetary_computer:
+  search:
+    type: StacSearch
+    api_endpoint: https://planetarycomputer.microsoft.com/api/stac/v1
+    need_auth: false
+  products:
+    deltares_floods:
+      productType: deltares-floods
+      description: Global coastal flood depth (inundation) under sea-level-rise/return-period scenarios. Data assets
+        are global NetCDF, read windowed to the AOI via xarray (needs the [netcdf] extra); signed automatically
+        (free, no account).
+    sentinel_2_l2a:
+      productType: sentinel-2-l2a
+      description: The [Sentinel-2](https://sentinel.esa.int/web/sentinel/missions/sentinel-2) program provides
+        global imagery in thirteen spectral bands at 10m-60m resolution and a revisit time of approximately five
+        days.  This dataset represents the global Sentinel-2 archive, from 2016 to the present, processed to L2A
+        (bottom-of-atmosphere) using [Sen2Cor](https://step.esa.int/main/snap-supported-plugins/sen2cor/) and converted
+        to [cloud-optimized GeoTIFF](https://www.cogeo.org/) format.
+natural_earth_rivers:
+  search:
+    type: REST
+    api_endpoint: https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson
+    need_auth: false
+  products:
+    ne_10m_rivers_lake_centerlines_geojson:
+      productType: ne_10m_rivers_lake_centerlines.geojson
+      description: Rivers & lake centerlines — 10m, detailed (named, incl. major fleuves like the Nile)
+    ne_10m_rivers_lake_centerlines:
+      productType: ne_10m_rivers_lake_centerlines
+      description: Global river/fleuve POLYLINES (one named line per major river — the Nile, Amazon…), plus lake
+        centerlines. Static GeoJSON (the whole file is fetched, then clipped to the AOI client-side), EPSG:4326.
+        Use 10m for detail/names, 50m or 110m for a light world overview. No server-side bbox filter.
+brgm_risques:
+  search:
+    type: WMS
+    api_endpoint: https://www.georisques.gouv.fr/services
+    need_auth: false
+  products:
+    PPRN_INOND:
+      productType: PPRN_INOND
+      description: PPR Inondation
+    PPRN_ZONE_INOND:
+      productType: PPRN_ZONE_INOND
+      description: Zonage réglementaire des PPR Inondation
+    MASQ_EAIP:
+      productType: MASQ_EAIP
+      description: La banque inondations / remontées de nappes est la base de données des cartes départementales
+        de sensibilité au phénomène de remontées de nappes (crues, inondations, ruissellements...), en domaine sédimentaire
+        et de socle.
+overture_maps:
+  search:
+    type: overture_tiles.py
+    api_endpoint: https://overturemaps.org/
+    need_auth: false
+  products:
+    places:
+      productType: places
+      description: Places / POIs (name, category)
+    buildings:
+      productType: buildings
+      description: Building footprints (height, class)
+    transportation:
+      productType: transportation
+      description: Roads & paths (segments)
+    divisions:
+      productType: divisions
+      description: Administrative divisions (areas)
+overpass:
+  search:
+    type: overpass.py
+    api_endpoint: https://overpass-api.de/api/interpreter
+    need_auth: false
+  products:
+    waterway_river:
+      productType: waterway=river
+      description: Rivers (OSM waterway=river) — lines, e.g. the Nile
+    natural_water:
+      productType: natural=water
+      description: Water bodies — lakes/ponds (OSM natural=water)
+    public_transport_stop_position:
+      productType: public_transport=stop_position
+      description: Public-transport stops
+geoboundaries:
+  search:
+    type: REST
+    api_endpoint: https://www.geoboundaries.org/api/current
+    need_auth: false
+  products:
+    gbOpen_FRA_ADM2:
+      productType: gbOpen/FRA/ADM2
+      description: Open database of administrative boundaries for every country. The API returns metadata JSON with
+        a gjDownloadURL (GeoJSON on GitHub) — no bbox filter, download the level you need client-side.
+gwis:
+  search:
+    type: WMS
+    api_endpoint: https://maps.effis.emergency.copernicus.eu/gwis
+    need_auth: false
+  products:
+    mcd64a1_annual_composite_c12:
+      productType: mcd64a1.annual_composite.c12
+      description: mcd64a1.annual_composite.c12
+nasa_firms:
+  search:
+    type: REST
+    api_endpoint: https://firms.modaps.eosdis.nasa.gov/api
+    need_auth: true
+  auth:
+    credentials:
+      api_key: ${NASA_FIRMS_API_KEY}
+  products:
+    fires_nrt:
+      productType: fires_nrt
+      description: MODIS/VIIRS near-real-time active fires. Free MAP_KEY required (in the URL path). Returns CSV
+        with latitude/longitude — needs CSV parsing.
+marine_regions:
+  search:
+    type: WFS
+    api_endpoint: https://geo.vliz.be/geoserver/MarineRegions/wfs
+    need_auth: false
+  products:
+    MarineRegions_eez:
+      productType: MarineRegions:eez
+      description: Version 12 of the Exclusive Economic Zones from the VLIZ Maritime Boundaries Geodatabase. An
+        exclusive economic zone (EEZ) is a seazone extending from a state's coast or baseline over which the state
+        has special rights over the exploration and use of marine resources. Generally a state's EEZ extends 200
+        nautical miles out from its coast, except where resulting points would be closer to another country. This
+        dataset also contains delimitation of disputed areas and joint regimes.
+      static: true
+openrailwaymap:
+  search:
+    type: XYZ
+    api_endpoint: https://a.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png
+    need_auth: false
+    tileSize: 512
+  products:
+    tiles:
+      productType: tiles
+      description: OpenRailwayMap (rail infrastructure tiles)

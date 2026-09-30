@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+.conda/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# GeoDataCatalog runtime
+geo_cache/
+output/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Local secrets
+.env
