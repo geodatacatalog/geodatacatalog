@@ -32,13 +32,7 @@ The bundled [`catalog.yml`](catalog.yml) is a ready-to-use **extract of the sour
 - [Quickstart](#quickstart)
 - [GeoRequest — the unified request](#georequest--the-unified-request)
 - [The catalog — where sources become a fetchable config](#the-catalog--where-sources-become-a-fetchable-config)
-  - [The fetch workflow — request in, datasets out](#the-fetch-workflow--request-in-datasets-out)
-  - The STAC workflow — inspect, sort, then load *(collapsed)*
-  - `load()` vs `download()` *(collapsed)*
-  - Band mapping — one name, every provider *(collapsed)*
-  - Configuration reference — the raw `catalog.yml` schema *(collapsed)*
 - [CatalogResults — working with results](#catalogresults--working-with-results)
-  - Export and reload — save results, reopen them later
 - [Bundled providers](#bundled-providers)
 - [REST APIs — no plugin needed](#rest-apis--no-plugin-needed)
 - [Writing a plugin](#writing-a-plugin)
@@ -122,6 +116,27 @@ uv pip install -e ".[all,dev]"           # or: pip install -e ".[all,dev]"
 pytest
 ```
 
+### Setting the secrets
+
+Provider credentials (`${VAR}` in `catalog.yml`) are read from the environment at
+load time — never stored in the file. Copy [.env.example](.env.example) to `.env`
+(gitignored), fill in your keys, and load it:
+
+```bash
+cp .env.example .env
+set -a && source .env && set +a       # bash / zsh
+```
+
+or from Python/Jupyter, before `load_catalog()`:
+
+```python
+from dotenv import load_dotenv        # pip install python-dotenv
+load_dotenv()
+```
+
+Providers whose variables are unset are simply skipped with a warning; everything
+else keeps working.
+
 ## Quickstart
 
 ```python
@@ -197,19 +212,19 @@ Each top-level key is a provider, describing how to search it, how to authentica
 and which products it exposes. A real (trimmed) example:
 
 ```yaml
-earth_search:                          # provider
+earth_search:                          # provider name → layer ids `earth_search__<product>`
     search:
-        type: StacSearch
+        type: StacSearch               # StacSearch | WFS | WMS | WMTS | WCS | REST | OSMNX | XYZ | <plugin>.py
         api_endpoint: https://earth-search.aws.element84.com/v1/search
-        need_auth: false
+        need_auth: false               # true → provider skipped when credentials are missing
     auth:
-        no-sign-request: true
+        no-sign-request: true          # public bucket; see "Authentication patterns" below
     products:
         S2_L2A:                        # product → layer id `earth_search__S2_L2A`
             productType: sentinel-2-l2a
             description: Sentinel-2 L2A surface reflectance (10 m, COG)
-            cloudCover: 100
-            bandMapping:
+            cloudCover: 100            # item filter on eo:cloud_cover
+            bandMapping:               # provider asset → common name (pivot); optional
             - blue: blue
             - red: red
             - nir: nir
@@ -339,43 +354,7 @@ mapping get no `eo:bands`, so no spurious alias is exposed.
 </details>
 
 <details>
-<summary><b>Configuration reference — the raw <code>catalog.yml</code> schema</b></summary>
-
-```yaml
-provider_name:
-    search:
-        type: StacSearch        # StacSearch | WFS | WMS | WMTS | WCS | REST | OSMNX | XYZ | <plugin>.py
-        api_endpoint: https://...
-        need_auth: false        # true → provider skipped when credentials are missing
-    auth:
-        credentials:
-            api_key: ${MY_API_KEY}      # ${VAR} / ${VAR:-default} resolved from the environment
-    products:
-        my_product:
-            productType: <remote identifier>
-            description: Human readable description
-            static: true        # no time dimension → datetime filter skipped
-            bandMapping:        # provider asset → pivot (common name); optional
-                B04: red
-```
-
-**Setting the secrets.** Copy [.env.example](.env.example) to `.env` (gitignored), fill in your keys, and load it:
-
-```bash
-cp .env.example .env
-set -a && source .env && set +a       # bash / zsh
-```
-
-or from Python/Jupyter, before `load_catalog()`:
-
-```python
-from dotenv import load_dotenv        # pip install python-dotenv
-load_dotenv()
-```
-
-Providers whose variables are unset are skipped with a warning; everything else keeps working.
-
-**Authentication patterns:**
+<summary><b>Authentication patterns</b></summary>
 
 ```yaml
 auth:
@@ -397,6 +376,10 @@ auth:
 auth:
     no-sign-request: true
 ```
+
+`${VAR}` / `${VAR:-default}` are resolved from the environment at load time.
+Providers whose variables are unset are skipped with a warning; everything else
+keeps working. See [Installation](#installation) for how to provide the secrets.
 
 </details>
 
