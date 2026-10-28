@@ -120,6 +120,7 @@ class GeoRequest:
     def explore(self, **kwargs):
         """Show the AOI and bbox on an interactive map (geopandas .explore())."""
         import geopandas as gpd
+        from .viz import _new_folium_map
 
         meta = {
             "bbox":       str(self.bbox),
@@ -133,7 +134,9 @@ class GeoRequest:
 
         bbox_gdf = gpd.GeoDataFrame([meta], geometry=[box(*self.bbox)], crs="EPSG:4326")
 
-        m = None
+        # Seed the map with a policy-friendly basemap: passing an actual Map
+        # (rather than None) stops geopandas from adding OSM's blocked tiles.
+        m = _new_folium_map()
         styles = [
             {"color": "#3388ff", "fillOpacity": 0.15},
             {"color": "#ff4444", "fillOpacity": 0.0, "weight": 2, "dashArray": "6 4"},

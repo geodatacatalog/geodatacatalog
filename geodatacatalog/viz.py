@@ -8,11 +8,36 @@ import xarray as xr
 
 log = logging.getLogger(__name__)
 
+#: Default raster basemap tiles for interactive maps. We deliberately avoid
+#: ``tile.openstreetmap.org``: OSM's volunteer-run tile servers block
+#: application/automated use (see https://osm.wiki/Blocked), which shows up as
+#: an "Access blocked / not following the tile usage policy" error in saved
+#: HTML. CARTO's free basemaps are key-less, permissive and OSM-derived.
+BASEMAP_TILES = (
+    "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+)
+BASEMAP_ATTR = (
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> '
+    'contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+)
+
+
+def _new_folium_map(location=None, **kwargs):
+    """A folium.Map with a tile-usage-policy-friendly basemap (see ``BASEMAP_TILES``).
+
+    Extra keyword arguments are forwarded to ``folium.Map``. Any ``tiles`` /
+    ``attr`` passed by the caller wins, so users can still pick their own
+    basemap.
+    """
+    import folium
+
+    kwargs.setdefault("tiles", BASEMAP_TILES)
+    kwargs.setdefault("attr", BASEMAP_ATTR)
+    return folium.Map(location=location, **kwargs)
+
 
 def _init_folium_map(data: dict, request=None):
     """Create a folium.Map fitted to the request bbox, or to the first dataset."""
-    import folium
-
     b = None
 
     if request is not None and getattr(request, "aoi_gdf", None) is not None:
@@ -70,7 +95,7 @@ def _init_folium_map(data: dict, request=None):
         return None
 
     center = [(b[1] + b[3]) / 2, (b[0] + b[2]) / 2]
-    m = folium.Map(location=center, control_scale=True)
+    m = _new_folium_map(location=center, control_scale=True)
     m.fit_bounds([[b[1], b[0]], [b[3], b[2]]])
     return m
 
