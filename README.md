@@ -66,12 +66,7 @@ Fetching "all the data over my area of interest" usually means juggling owslib, 
 
 ## Installation
 
-The core installs with pip / [uv](https://docs.astral.sh/uv/) — the published
-wheels of `geopandas`, `shapely`, `pyogrio`, `rasterio` and `pyproj` **bundle
-GEOS, GDAL and PROJ**, so nothing has to be built and no system GDAL is needed
-(verified on Linux wheels: GEOS ≥ 3.13 — so `shapely.remove_repeated_points`
-works — and GDAL 3.12):
-
+The core installs with pip / [uv](https://docs.astral.sh/uv/):
 ```bash
 uv pip install .                      # core
 uv pip install ".[all]"               # + viz, jupyter, osm, s3, overture, netcdf
@@ -81,6 +76,8 @@ uv pip install ".[viz,jupyter]"       # or pick individual extras
 Pip works the same (`pip install ".[all]"`). Use **Python 3.11 or 3.12**: the
 project targets `>=3.11`, and a few extras (`odc-algo` → `numexpr`) have no
 wheel yet on 3.13+ and would need a C++ toolchain to build.
+
+> **Note:**  the published wheels of `geopandas`, `shapely`, `pyogrio`, `rasterio` and `pyproj` **bundle GEOS, GDAL and PROJ**, so nothing has to be built and no system GDAL is needed 
 
 Available extras:
 
