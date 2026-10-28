@@ -1130,16 +1130,32 @@ def _compute_scl_cloud_coverage(item, bbox) -> float:
 
 
 def _apply_band_mapping(items: list, band_mapping: dict[str, str]):
-    """Mutate STAC assets so odc-stac resolves bands through eo:common_name."""
+    """Mutate STAC assets so odc-stac resolves bands through eo:common_name.
+
+    odc-stac only reads the ``eo:bands`` aliases via pystac's ``EOExtension``,
+    which refuses to operate unless the ``eo`` extension is declared in the
+    item's ``stac_extensions`` (``ExtensionNotImplemented`` otherwise). Many
+    collections carry no such declaration even when a ``bandMapping`` is
+    configured, so the extension is registered here — without it the pivot
+    names (`wtr`, ...) never resolve and ``load(bands=[pivot])`` fails with
+    "No such band/alias".
+    """
     for item in items:
+        touched = False
         for asset_name, asset in item.assets.items():
             if asset_name in band_mapping:
                 asset.extra_fields["eo:bands"] = [
                     {"name": asset_name, "common_name": band_mapping[asset_name]}
                 ]
+                touched = True
             else:
                 asset.extra_fields.pop("eo:bands", None)
                 asset.extra_fields.pop("bands", None)
+        if touched:
+            try:
+                item.ext.add("eo")
+            except Exception as e:  # noqa: BLE001 — older pystac / odd items
+                log.debug(f"could not register the 'eo' extension on {item.id}: {e}")
 
 
 def _all_nodata(ds) -> bool:
