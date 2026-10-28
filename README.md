@@ -286,9 +286,9 @@ credentials.
 per `(item, asset)`, and returns `{layer_id: [Path, ...]}`:
 
 ```python
-paths = results.sel("nasa_pocloud__opera_dswx_s1").download(
-    dest="./tiles", bands=["wtr"])           # → {"<layer_id>": [Path(".../B01_WTR.tif")]}
-# paths["nasa_pocloud__opera_dswx_s1"][0]  → open it with rasterio / xarray yourself
+paths = results.sel("earth_search__S2_L2A").download(
+    dest="./tiles", bands=["red"])           # → {"earth_search__S2_L2A": [Path("..._red.tif")]}
+# paths["earth_search__S2_L2A"][0]  → open it with rasterio / xarray yourself
 ```
 
 Reach for `download()` when `.load()` can't (or shouldn't) turn the asset into a
@@ -296,42 +296,43 @@ dataset:
 
 - **non-COG / non-georeferenced formats** the raster loader can't open (e.g. NASA
   LP DAAC's zipped `.hgt`) — a clear error is raised rather than a cryptic one;
-- **auth-gated COGs served through a redirect to a pre-signed URL** (e.g. OPERA
-  DSWx-S1 on NASA POCLOUD): `download` follows the redirect with `requests` and
-  correctly *drops* the `Authorization` header on the signed cross-host URL, whereas
+- **auth-gated COGs served through a redirect to a pre-signed URL** (e.g. NASA
+  Earthdata DAACs): `download` follows the redirect with `requests` and correctly
+  *drops* the `Authorization` header on the signed cross-host URL, whereas
   odc-stac's `/vsicurl` read re-sends it and gets a `404`;
 - whenever you want the **raw tile** (native resolution/CRS/nodata) rather than a
   reprojected, AOI-clipped array.
 
 `bands=` accepts provider asset keys *or* the catalog's common names (`bandMapping`
-pivots, e.g. `"wtr"`), exactly like `load()`. Without `layer_id`, every layer still
+pivots, e.g. `"red"`), exactly like `load()`. Without `layer_id`, every layer still
 holding STAC items is downloaded into its own `dest/{layer_id}` subfolder.
 
 #### Band mapping — one name, every provider
 
 Providers name the same physical band differently: Sentinel-2's red band is the
-`red` asset on Earth Search, `B04` elsewhere, and OPERA DSWx-S1's water band is
-the `0_B01_WTR` asset. `bandMapping` declares a **pivot** (a provider-agnostic
-common name) for each provider asset, so your code never mentions the provider's
-own key:
+`red` asset on Earth Search, but `B04_10m` on Copernicus Data Space. `bandMapping`
+declares a **pivot** (a provider-agnostic common name) for each provider asset, so
+your code never mentions the provider's own key:
 
 ```yaml
 products:
-    opera_dswx_s1:
-        productType: OPERA_L3_DSWX-S1_V1_1.0
+    S2_L2A:
+        productType: sentinel-2-l2a
         bandMapping:
-        - 0_B01_WTR: wtr      # provider asset → pivot
-        - 0_B02_BWTR: bwtr
-        - 0_B03_CONF: conf
+        - B01_20m: coastal    # provider asset → pivot
+        - B02_10m: blue
+        - B03_10m: green
+        - B04_10m: red
+        - B08_10m: nir
 ```
 
 ```python
-results.load(bands=["wtr"])                       # XR Dataset, the provider key stays hidden
-results.download(bands=["wtr"], dest="./tiles")   # same pivot, raw file on disk
+results.load(bands=["red", "nir"])                # XR Dataset, the provider keys stay hidden
+results.download(bands=["red"], dest="./tiles")   # same pivot, raw file on disk
 ```
 
 Both `load()` and `download()` accept **either** the provider asset key
-(`"0_B01_WTR"`) **or** the pivot (`"wtr"`); resolution goes through `bandMapping`.
+(`"B04_10m"`) **or** the pivot (`"red"`); resolution goes through `bandMapping`.
 
 **How it works.** At search time the mapping is written onto each STAC item as an
 `eo:bands` entry — `{"name": <asset>, "common_name": <pivot>}` — and the `eo`
@@ -340,7 +341,7 @@ pivot as a band name (`eo:common_name` → the asset's canonical name). This is
 also why a product can map only the bands you care about: assets left out of the
 mapping get no `eo:bands`, so no spurious alias is exposed.
 
-> **Tip:** keep the pivot identical across providers (`wtr`, `red`, `nir`, …) and
+> **Tip:** keep the pivot identical across providers (`red`, `nir`, `blue`, …) and
 > the same request works whatever the source — that is the whole point of the
 > mapping.
 
