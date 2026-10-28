@@ -247,6 +247,30 @@
     layer: MYD09GA_061
     checked_at: '2026-08-08'
     count: 100
+- id: nasa_cmr_pocloud
+  name: NASA CMR-STAC (POCLOUD)
+  type: stac
+  endpoint: https://cmr.earthdata.nasa.gov/cloudstac/POCLOUD
+  provider: NASA Earthdata
+  coverage: global
+  themes:
+  - satellite
+  - water
+  - imagery
+  - landcover
+  auth: none
+  auth_url: https://urs.earthdata.nasa.gov/users/new
+  test:
+    collection: OPERA_L3_DSWX-S1_V1_1.0
+  notes: OPERA DSWx-S1 (Dynamic Surface Water Extent from Sentinel-1) and other NASA PO.DAAC cloud collections.
+    Reading the data assets needs a free NASA Earthdata login (set up ~/.netrc for urs.earthdata.nasa.gov, or an
+    EARTHDATA_TOKEN bearer token); without it the assets come back as a login redirect and the fetch fails.
+  summary: OPERA DSWx-S1 dynamic surface water extent and other NASA PO.DAAC collections via STAC.
+  status:
+    state: ok
+    latency_ms: 1121
+    checked_at: '2026-10-28'
+    detail: STAC /collections OK
 - id: geodes
   name: GEODES (CNES)
   type: stac
@@ -860,13 +884,13 @@
     TIME=<date>: the server default is stale (2021-01-01) — always pass a recent date. EXCEPTION — HOTSPOTS (all.hs,
     viirs.hs, modis.hs...): they declare a time dimension but an explicit TIME= renders EMPTY everywhere; request
     them WITHOUT TIME to get the current detections. BURNT AREAS: this is a raster-only WMS — the .poly (polygon)
-    variants render BLANK through GetMap, so for a visible map or a raster fetch use modis.ba.<year> (e.g.
-    modis.ba.2024) or modis.ba.point.<year>, NEVER modis.ba.poly.*. For actual burnt-area POLYGONS (vector), the
-    same MapServer host answers WFS GetFeature instead of WMS GetMap — see source id effis_ba (typenames need the
-    ms: namespace prefix, e.g. ms:modis.ba.poly.season). effis.nrt.ba is BROKEN server-side for WMS (checked
-    2026-07-13): the group includes effis.nrt.ba.point whose GetMap answers HTTP 200 text/xml ServiceException
-    "msPostGISLayerWhichShapes(): Query error" — for near-real-time burnt areas use nrt.ba.today / nrt.ba.week on
-    the gwis endpoint (source id: gwis) instead, or effis_ba''s WFS which works for both.'
+    variants render BLANK through GetMap, so for a visible map or a raster fetch use modis.ba.<year> (e.g. modis.ba.2024)
+    or modis.ba.point.<year>, NEVER modis.ba.poly.*. For actual burnt-area POLYGONS (vector), the same MapServer
+    host answers WFS GetFeature instead of WMS GetMap — see source id effis_ba (typenames need the ms: namespace
+    prefix, e.g. ms:modis.ba.poly.season). effis.nrt.ba is BROKEN server-side for WMS (checked 2026-07-13): the
+    group includes effis.nrt.ba.point whose GetMap answers HTTP 200 text/xml ServiceException "msPostGISLayerWhichShapes():
+    Query error" — for near-real-time burnt areas use nrt.ba.today / nrt.ba.week on the gwis endpoint (source id:
+    gwis) instead, or effis_ba''s WFS which works for both.'
   summary: European wildfire danger indices, burnt areas and hotspots (Copernicus EFFIS).
   status:
     state: ok
@@ -890,30 +914,29 @@
   - forest
   auth: none
   test:
-    layer: 'ms:modis.ba.poly.season'
+    layer: ms:modis.ba.poly.season
   layers:
-  - id: 'ms:modis.ba.poly.season'
+  - id: ms:modis.ba.poly.season
     title: Burnt-area polygons, current fire season (AREA_HA/FIREDATE/COMMUNE/COUNTRY attributes)
-  - id: 'ms:modis.ba.poly.month'
+  - id: ms:modis.ba.poly.month
     title: Burnt-area polygons, last 30 days
-  - id: 'ms:modis.ba.poly.week'
+  - id: ms:modis.ba.poly.week
     title: Burnt-area polygons, last 7 days
-  - id: 'ms:modis.ba.poly.today'
+  - id: ms:modis.ba.poly.today
     title: Burnt-area polygons, today
-  - id: 'ms:effis.nrt.ba.poly'
+  - id: ms:effis.nrt.ba.poly
     title: Near-real-time burnt-area polygons (geometry only, no attributes)
-  notes: 'Vector counterpart to the `effis` WMS: its .poly layers render blank through GetMap, but the same
-    MapServer host serves the same data as real polygons through WFS GetFeature — this source. Typenames MUST
-    carry the ms: namespace prefix (bare "modis.ba.poly.season" is absent from GetCapabilities, only
-    "ms:modis.ba.poly.season" is). modis.ba.poly.<today|week|month|season|YYYY> carry real per-fire attributes
-    (AREA_HA, FIREDATE, COMMUNE, COUNTRY, land-cover breakdown...); effis.nrt.ba.poly returns geometry only,
-    empty properties — prefer modis.ba.poly.today/.week for a dated near-real-time vector with attributes. GOTCHA:
-    GetCapabilities is SLOW (~65-115s observed 2026-09) — geodatacatalog''s default 60s layer timeout is too
-    short and will time out on the first fetch; set a per-product `timeout: 120` (or more) in catalog.yml
-    (config.py forwards a WFS product''s `timeout` key to WFSLayer) or via WFSLayer(timeout=...) directly.
-    Verified through geodatacatalog''s own WFSLayer (not just curl): ms:modis.ba.poly.season over a France bbox
-    returned 2903 polygons with correct axis order/CRS after reprojection (2026-09-09). Discovered by
-    reverse-engineering github.com/rozierguillaume/flamap''s fetch_fires.py, which uses this same WFS.'
+  notes: 'Vector counterpart to the `effis` WMS: its .poly layers render blank through GetMap, but the same MapServer
+    host serves the same data as real polygons through WFS GetFeature — this source. Typenames MUST carry the ms:
+    namespace prefix (bare "modis.ba.poly.season" is absent from GetCapabilities, only "ms:modis.ba.poly.season"
+    is). modis.ba.poly.<today|week|month|season|YYYY> carry real per-fire attributes (AREA_HA, FIREDATE, COMMUNE,
+    COUNTRY, land-cover breakdown...); effis.nrt.ba.poly returns geometry only, empty properties — prefer modis.ba.poly.today/.week
+    for a dated near-real-time vector with attributes. GOTCHA: GetCapabilities is SLOW (~65-115s observed 2026-09)
+    — geodatacatalog''s default 60s layer timeout is too short and will time out on the first fetch; set a per-product
+    `timeout: 120` (or more) in catalog.yml (config.py forwards a WFS product''s `timeout` key to WFSLayer) or via
+    WFSLayer(timeout=...) directly. Verified through geodatacatalog''s own WFSLayer (not just curl): ms:modis.ba.poly.season
+    over a France bbox returned 2903 polygons with correct axis order/CRS after reprojection (2026-09-09). Discovered
+    by reverse-engineering github.com/rozierguillaume/flamap''s fetch_fires.py, which uses this same WFS.'
   summary: Burnt-area polygons (vector) for EFFIS — the WFS counterpart to the effis WMS raster.
   status:
     state: ok
@@ -923,7 +946,7 @@
   fetch:
     state: ok
     detail: 2903 polygons (France bbox, ms:modis.ba.poly.season, ~116s incl. slow GetCapabilities)
-    layer: 'ms:modis.ba.poly.season'
+    layer: ms:modis.ba.poly.season
     checked_at: '2026-09-09'
 - id: gwis
   name: Copernicus GWIS (feux mondiaux)

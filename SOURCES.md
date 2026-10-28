@@ -4,7 +4,7 @@
 > [`geodatacatalog/explorer/sources.yml`](geodatacatalog/explorer/sources.yml);
 > regenerate with `geodatacatalog check` (probes every service) or `geodatacatalog md`.
 >
-> 158 sources · last check: 2026-09-09 · search them with
+> 159 sources · last check: 2026-10-28 · search them with
 > `geodatacatalog search "forêt"` (FR/EN) and turn them into a config with
 > `geodatacatalog add <source> <layer> -o catalog.yml`.
 
@@ -55,6 +55,13 @@ Status: ✅ reachable & fetch confirmed · 🟡 reachable, fetch not confirmed (
   <details><summary>Détails</summary>
 
   HLS, ASTER, SRTM, NASADEM... Reading the data assets needs a free NASA Earthdata login (set up ~/.netrc for urs.earthdata.nasa.gov); without it the COGs come back as a login redirect and the fetch fails.
+
+  </details>
+- **[NASA CMR-STAC (POCLOUD)](https://cmr.earthdata.nasa.gov/cloudstac/POCLOUD)** (`nasa_cmr_pocloud`) ![STAC](https://img.shields.io/badge/STAC-blueviolet) 🌐 🟡 · ![satellite](https://img.shields.io/badge/satellite-blue) ![water](https://img.shields.io/badge/water-dodgerblue) ![imagery](https://img.shields.io/badge/imagery-blue) ![landcover](https://img.shields.io/badge/landcover-yellowgreen)
+  OPERA DSWx-S1 dynamic surface water extent and other NASA PO.DAAC collections via STAC.
+  <details><summary>Détails</summary>
+
+  OPERA DSWx-S1 (Dynamic Surface Water Extent from Sentinel-1) and other NASA PO.DAAC cloud collections. Reading the data assets needs a free NASA Earthdata login (set up ~/.netrc for urs.earthdata.nasa.gov, or an EARTHDATA_TOKEN bearer token); without it the assets come back as a login redirect and the fetch fails.
 
   </details>
 - **[GEODES (CNES)](https://geodes-portal.cnes.fr/api/stac)** (`geodes`) ![STAC](https://img.shields.io/badge/STAC-blueviolet) 🇫🇷 🟡 [🔒](https://geodes-portal.cnes.fr/MyInformation) · ![satellite](https://img.shields.io/badge/satellite-blue) ![imagery](https://img.shields.io/badge/imagery-blue) ![landcover](https://img.shields.io/badge/landcover-yellowgreen) ![agriculture](https://img.shields.io/badge/agriculture-gold)
