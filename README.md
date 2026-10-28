@@ -255,7 +255,7 @@ Every provider shares that contract. What differs is how a layer's *items* are t
 into data — the STAC case below is the most involved one.
 
 <details>
-<summary><b>The STAC workflow — inspect, sort, then load</b></summary>
+<summary>The STAC workflow — inspect, sort, then load</summary>
 
 STAC layers return raw `pystac.Item`s — inspect, filter, sort, *then* load or download:
 
@@ -280,7 +280,7 @@ Useful config knobs (per product, in `catalog.yml`):
 </details>
 
 <details>
-<summary><b>`load()` vs `download()`</b></summary>
+<summary>load() vs download()</summary>
 
 `.load()` builds an `xr.Dataset` in memory (odc-stac, reprojected and clipped to the
 AOI) — the convenient path for COGs readable anonymously or through cloud-native
@@ -314,7 +314,7 @@ holding STAC items is downloaded into its own `dest/{layer_id}` subfolder.
 </details>
 
 <details>
-<summary><b>Band mapping — one name, every provider</b></summary>
+<summary>Band mapping — one name, every provider</summary>
 
 Providers name the same physical band differently: Sentinel-2's red band is the
 `red` asset on Earth Search, `B04` elsewhere, and OPERA DSWx-S1's water band is
@@ -354,7 +354,7 @@ mapping get no `eo:bands`, so no spurious alias is exposed.
 </details>
 
 <details>
-<summary><b>Authentication patterns</b></summary>
+<summary>Authentication patterns</summary>
 
 ```yaml
 auth:
