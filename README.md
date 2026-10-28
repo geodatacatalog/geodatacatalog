@@ -33,12 +33,12 @@ The bundled [`catalog.yml`](catalog.yml) is a ready-to-use **extract of the sour
 - [GeoRequest — the unified request](#georequest--the-unified-request)
 - [The catalog — where sources become a fetchable config](#the-catalog--where-sources-become-a-fetchable-config)
   - [The fetch workflow — request in, datasets out](#the-fetch-workflow--request-in-datasets-out)
-  - [The STAC workflow — inspect, sort, then load](#the-stac-workflow--inspect-sort-then-load)
-  - [`load()` vs `download()`](#load-vs-download)
-  - [Band mapping — one name, every provider](#band-mapping--one-name-every-provider)
+  - The STAC workflow — inspect, sort, then load *(collapsed)*
+  - `load()` vs `download()` *(collapsed)*
+  - Band mapping — one name, every provider *(collapsed)*
+  - Configuration reference — the raw `catalog.yml` schema *(collapsed)*
 - [CatalogResults — working with results](#catalogresults--working-with-results)
-  - [Export and reload — save results, reopen them later](#export-and-reload--save-results-reopen-them-later)
-- [Configuration (catalog.yml)](#configuration-catalogyml)
+  - Export and reload — save results, reopen them later
 - [Bundled providers](#bundled-providers)
 - [REST APIs — no plugin needed](#rest-apis--no-plugin-needed)
 - [Writing a plugin](#writing-a-plugin)
@@ -193,16 +193,30 @@ request.explore()                    # show AOI + bbox on a map
 ## The catalog — where sources become a fetchable config
 
 A single YAML file drives every fetch: the **catalog** you pass to `load_catalog()`.
-Its root maps a provider name to how the source is searched and which products it
-exposes:
+Each top-level key is a provider, describing how to search it, how to authenticate,
+and which products it exposes. A real (trimmed) example:
 
 ```yaml
-provider_name:
-    search: {type: StacSearch, api_endpoint: https://..., need_auth: false}
-    auth:   {credentials: {api_key: ${MY_API_KEY}}}
+earth_search:                          # provider
+    search:
+        type: StacSearch
+        api_endpoint: https://earth-search.aws.element84.com/v1/search
+        need_auth: false
+    auth:
+        no-sign-request: true
     products:
-        my_product: {productType: <remote id>}
+        S2_L2A:                        # product → layer id `earth_search__S2_L2A`
+            productType: sentinel-2-l2a
+            description: Sentinel-2 L2A surface reflectance (10 m, COG)
+            cloudCover: 100
+            bandMapping:
+            - blue: blue
+            - red: red
+            - nir: nir
 ```
+
+Layer ids are `{provider_name}__{product_id}`. The format is inspired by
+[EODAG](https://github.com/CS-SI/eodag) provider files.
 
 That file is **generated, then curated** — you rarely write it from scratch. The
 explorer's source registry (`geodatacatalog/explorer/sources.yml`, the source of
@@ -225,7 +239,8 @@ missing credentials are skipped with a warning instead of failing the whole requ
 Every provider shares that contract. What differs is how a layer's *items* are turned
 into data — the STAC case below is the most involved one.
 
-#### The STAC workflow — inspect, sort, then load
+<details>
+<summary><b>The STAC workflow — inspect, sort, then load</b></summary>
 
 STAC layers return raw `pystac.Item`s — inspect, filter, sort, *then* load or download:
 
@@ -240,7 +255,17 @@ sel                                          # items with date, cloud % / covera
     .load(bands=["red", "green", "blue"]))   # odc-stac → xr.Dataset, clipped to AOI
 ```
 
-##### `load()` vs `download()`
+Useful config knobs (per product, in `catalog.yml`):
+
+- `cloudCover`: filter on the `eo:cloud_cover` metadata.
+- `cloudCoverAoi`: compute the *actual* cloud fraction over your AOI from the SCL band (slower, much more accurate).
+- `imageCoverageThreshold`: discard items covering less than N % of the AOI.
+- `bandMapping`: map provider asset names to common band names, so `bands=["red","nir"]` works identically on every provider (see below).
+
+</details>
+
+<details>
+<summary><b><code>load()</code> vs <code>download()</code></b></summary>
 
 `.load()` builds an `xr.Dataset` in memory (odc-stac, reprojected and clipped to the
 AOI) — the convenient path for COGs readable anonymously or through cloud-native
@@ -271,14 +296,10 @@ dataset:
 pivots, e.g. `"wtr"`), exactly like `load()`. Without `layer_id`, every layer still
 holding STAC items is downloaded into its own `dest/{layer_id}` subfolder.
 
-Useful config knobs (per product, in `catalog.yml`):
+</details>
 
-- `cloudCover`: filter on the `eo:cloud_cover` metadata.
-- `cloudCoverAoi`: compute the *actual* cloud fraction over your AOI from the SCL band (slower, much more accurate).
-- `imageCoverageThreshold`: discard items covering less than N % of the AOI.
-- `bandMapping`: map provider asset names to common band names, so `bands=["red","nir"]` works identically on every provider (see below).
-
-##### Band mapping — one name, every provider
+<details>
+<summary><b>Band mapping — one name, every provider</b></summary>
 
 Providers name the same physical band differently: Sentinel-2's red band is the
 `red` asset on Earth Search, `B04` elsewhere, and OPERA DSWx-S1's water band is
@@ -315,45 +336,10 @@ mapping get no `eo:bands`, so no spurious alias is exposed.
 > the same request works whatever the source — that is the whole point of the
 > mapping.
 
-## CatalogResults — working with results
+</details>
 
-`fetch()` returns a `CatalogResults`: dict-like access plus a fluent API.
-
-```python
-gdf   = results["ign__communes"]            # GeoDataFrame
-da    = results["ign_wmts__foret"]          # xarray.DataArray
-items = results["earth_search__S2_L2A"]     # list[pystac.Item]
-
-results.explore()                           # all layers on one Folium map
-results.sel("ign_wmts__foret").explore()    # a single layer
-results.compute_stats()                     # per-polygon zonal statistics
-results.export("./output", formats={"ign__communes": "gpkg"})
-```
-
-Multi-polygon mode:
-
-```python
-results[0]                  # CatalogResults of the first polygon
-results["layer_id"]         # that layer across all polygons (list)
-results.sel("layer_id")     # filter every polygon down to one layer
-results.compute_stats()     # one row per polygon
-```
-
-### Export and reload — save results, reopen them later
-
-```python
-results.export("./output")                       # geojson for vectors, GeoTIFF for rasters
-results.export("./output", formats={
-    "ign__communes": "gpkg",
-    "earth_search__S2_L2A": "nc",
-})
-
-# Later — rebuild a CatalogResults from the exported files
-results = catalog.from_files("./output")         # request restored from _request.json
-results.compute_stats()
-```
-
-## Configuration (catalog.yml)
+<details>
+<summary><b>Configuration reference — the raw <code>catalog.yml</code> schema</b></summary>
 
 ```yaml
 provider_name:
@@ -372,8 +358,6 @@ provider_name:
             bandMapping:        # provider asset → pivot (common name); optional
                 B04: red
 ```
-
-Layer ids are `{provider_name}__{product_id}`. The format is inspired by [EODAG](https://github.com/CS-SI/eodag) provider files.
 
 **Setting the secrets.** Copy [.env.example](.env.example) to `.env` (gitignored), fill in your keys, and load it:
 
@@ -412,6 +396,46 @@ auth:
 # Public S3 buckets:
 auth:
     no-sign-request: true
+```
+
+</details>
+
+## CatalogResults — working with results
+
+`fetch()` returns a `CatalogResults`: dict-like access plus a fluent API.
+
+```python
+gdf   = results["ign__communes"]            # GeoDataFrame
+da    = results["ign_wmts__foret"]          # xarray.DataArray
+items = results["earth_search__S2_L2A"]     # list[pystac.Item]
+
+results.explore()                           # all layers on one Folium map
+results.sel("ign_wmts__foret").explore()    # a single layer
+results.compute_stats()                     # per-polygon zonal statistics
+results.export("./output", formats={"ign__communes": "gpkg"})
+```
+
+Multi-polygon mode:
+
+```python
+results[0]                  # CatalogResults of the first polygon
+results["layer_id"]         # that layer across all polygons (list)
+results.sel("layer_id")     # filter every polygon down to one layer
+results.compute_stats()     # one row per polygon
+```
+
+### Export and reload — save results, reopen them later
+
+```python
+results.export("./output")                       # geojson for vectors, GeoTIFF for rasters
+results.export("./output", formats={
+    "ign__communes": "gpkg",
+    "earth_search__S2_L2A": "nc",
+})
+
+# Later — rebuild a CatalogResults from the exported files
+results = catalog.from_files("./output")         # request restored from _request.json
+results.compute_stats()
 ```
 
 ## Bundled providers
