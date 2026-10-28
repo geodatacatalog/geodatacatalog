@@ -53,7 +53,16 @@ s3 = ["boto3"]                  # signed S3 downloads (e.g. Copernicus Data Spac
 overture = ["pmtiles", "mapbox-vector-tile", "mercantile", "duckdb"]  # Overture: vector-tile path (default, fast) + GeoParquet path (duckdb, exact)
 jupyter = ["nest_asyncio", "ipywidgets", "folium", "matplotlib", "mapclassify"]
 netcdf = ["netcdf4", "odc-algo", "h5netcdf", "fsspec[http]", "s3fs"]  # h5netcdf+fsspec: windowed remote read of NetCDF/HDF5 STAC assets (e.g. PC deltares-floods); s3fs: those hosted on S3 (e.g. Copernicus CLMS *.nc)
-all = ["folium", "ipywidgets", "osmnx", "boto3", "duckdb", "pmtiles", "mapbox-vector-tile", "mercantile", "matplotlib", "mapclassify", "nest_asyncio", "netcdf4", "odc-algo", "h5netcdf", "fsspec[http]", "s3fs"]
+# `all` composes every extra above (self-referencing) so a new dependency only
+# has to be declared once — in its own extra — to be picked up here.
+all = [
+    "geodatacatalog[viz]",
+    "geodatacatalog[osm]",
+    "geodatacatalog[s3]",
+    "geodatacatalog[overture]",
+    "geodatacatalog[jupyter]",
+    "geodatacatalog[netcdf]",
+]
 dev = ["pytest", "ruff"]
 
 [project.scripts]

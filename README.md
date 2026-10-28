@@ -19,7 +19,7 @@ results = catalog.fetch(request, layers=[
 results.explore()               # interactive Folium map
 ```
 
-The bundled [`catalog.yml`](catalog.yml) is a ready-to-use **extract of the source registry**: it picks a curated subset of providers from [`geodatacatalog/explorer/sources.yml`](geodatacatalog/explorer/sources.yml) — the health-checked registry of open geospatial services — and focuses on **open French and European data**: IGN Géoplateforme, Copernicus (Sentinel, EFFIS, Corine Land Cover), CNES THEIA, Hub'Eau, BRGM, SANDRE, ISRIC SoilGrids, GEBCO and OpenStreetMap. The registry is the source of truth (159 sources); [`SOURCES.md`](SOURCES.md) is generated from it, and `geodatacatalog add … -o catalog.yml` materialises any registry entry as a catalog layer. Adding a provider requires zero Python code.
+The bundled [`catalog.yml`](catalog.yml) is a ready-to-use **extract of the source registry**: it picks a curated subset of providers (IGN, Copernicus (Sentinel, EFFIS, Corine Land Cover), CNES THEIA, Hub'Eau, BRGM, SANDRE, ISRIC SoilGrids, GEBCO and OpenStreetMap) extracted from [`geodatacatalog/explorer/sources.yml`](geodatacatalog/explorer/sources.yml) (159 sources); [`SOURCES.md`](SOURCES.md) is generated from it, and `geodatacatalog add … -o catalog.yml` materialises any registry entry as a catalog layer. Adding a provider requires zero Python code.
 
 > Interactive walkthrough: see [notebooks/example.ipynb](notebooks/example.ipynb).
 
@@ -68,26 +68,53 @@ Fetching "all the data over my area of interest" usually means juggling owslib, 
 
 ## Installation
 
-GDAL-based libraries are easiest to install through conda:
+The core installs with pip / [uv](https://docs.astral.sh/uv/) — the published
+wheels of `geopandas`, `shapely`, `pyogrio`, `rasterio` and `pyproj` **bundle
+GEOS, GDAL and PROJ**, so nothing has to be built and no system GDAL is needed
+(verified on Linux wheels: GEOS ≥ 3.13 — so `shapely.remove_repeated_points`
+works — and GDAL 3.12):
 
 ```bash
-conda env create -f environment.yml
+uv pip install .                      # core
+uv pip install ".[all]"               # + viz, jupyter, osm, s3, overture, netcdf
+uv pip install ".[viz,jupyter]"       # or pick individual extras
+```
+
+Pip works the same (`pip install ".[all]"`). Use **Python 3.11 or 3.12**: the
+project targets `>=3.11`, and a few extras (`odc-algo` → `numexpr`) have no
+wheel yet on 3.13+ and would need a C++ toolchain to build.
+
+Available extras:
+
+| Extra      | Adds                                                              |
+| ---------- | ----------------------------------------------------------------- |
+| `viz`      | `folium`, `ipywidgets`, `matplotlib`, `mapclassify` (maps, plots) |
+| `jupyter`  | `viz` + `nest_asyncio` (interactive notebooks)                    |
+| `osm`      | `osmnx` (OpenStreetMap)                                           |
+| `s3`       | `boto3` (signed S3 downloads, e.g. Copernicus Data Space)         |
+| `overture` | `pmtiles`, `mapbox-vector-tile`, `mercantile`, `duckdb` (Overture) |
+| `netcdf`   | `netcdf4`, `odc-algo`, `h5netcdf`, `fsspec[http]`, `s3fs`         |
+| `dev`      | `pytest`, `ruff`                                                  |
+
+`all` composes every extra above (it does **not** include `dev`).
+
+**When conda still helps.** `environment.yml` pins the whole geo stack from
+conda-forge for ABI consistency (pyogrio + fiona sharing one GDAL, `netcdf4` /
+`s3fs` built against the same HDF5/netCDF) and fixes Python 3.11. That is the
+safer path on platforms without prebuilt wheels (some ARM/macOS combos, older
+glibc) or when you need a strictly reproducible binary stack:
+
+```bash
+conda env create -f environment.yml      # or: mamba env create -f environment.yml
 conda activate geodatacatalog
 ```
 
-Or with pip (requires GDAL/PROJ available on your system):
+For development, either path works:
 
 ```bash
-pip install geodatacatalog            # core
-pip install "geodatacatalog[all]"     # + folium, ipywidgets, osmnx, netcdf, jupyter
-```
-
-For development:
-
-```bash
-git clone https://github.com/<you>/geodatacatalog
+git clone https://github.com/tduval/geodatacatalog
 cd geodatacatalog
-pip install -e ".[all,dev]"
+uv pip install -e ".[all,dev]"           # or: pip install -e ".[all,dev]"
 pytest
 ```
 
