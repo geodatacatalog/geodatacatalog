@@ -184,11 +184,11 @@ results.compute_stats()     # one row per polygon
 
 ## The STAC workflow
 
-STAC layers return raw `pystac.Item`s — inspect, filter, sort, *then* download:
+STAC layers return raw `pystac.Item`s — inspect, filter, sort, *then* load or download:
 
 ```python
 sel = results.sel("earth_search__S2_L2A")
-sel                                          # items with date, cloud %, coverage %
+sel                                          # items with date, cloud % / coverage %
 
 (results
     .sort(by="cloud_cover")                  # or "datetime", "coverage"
@@ -196,6 +196,37 @@ sel                                          # items with date, cloud %, coverag
     .first()                                 # keep the best item
     .load(bands=["red", "green", "blue"]))   # odc-stac → xr.Dataset, clipped to AOI
 ```
+
+### `load()` vs `download()`
+
+`.load()` builds an `xr.Dataset` in memory (odc-stac, reprojected and clipped to the
+AOI) — the convenient path for COGs readable anonymously or through cloud-native
+credentials.
+
+`.download()` instead saves the **original asset file(s) as-is** to disk, one file
+per `(item, asset)`, and returns `{layer_id: [Path, ...]}`:
+
+```python
+paths = results.sel("nasa_pocloud__opera_dswx_s1").download(
+    dest="./tiles", bands=["wtr"])           # → {"<layer_id>": [Path(".../B01_WTR.tif")]}
+# paths["nasa_pocloud__opera_dswx_s1"][0]  → open it with rasterio / xarray yourself
+```
+
+Reach for `download()` when `.load()` can't (or shouldn't) turn the asset into a
+dataset:
+
+- **non-COG / non-georeferenced formats** the raster loader can't open (e.g. NASA
+  LP DAAC's zipped `.hgt`) — a clear error is raised rather than a cryptic one;
+- **auth-gated COGs served through a redirect to a pre-signed URL** (e.g. OPERA
+  DSWx-S1 on NASA POCLOUD): `download` follows the redirect with `requests` and
+  correctly *drops* the `Authorization` header on the signed cross-host URL, whereas
+  odc-stac's `/vsicurl` read re-sends it and gets a `404`;
+- whenever you want the **raw tile** (native resolution/CRS/nodata) rather than a
+  reprojected, AOI-clipped array.
+
+`bands=` accepts provider asset keys *or* the catalog's common names (`bandMapping`
+pivots, e.g. `"wtr"`), exactly like `load()`. Without `layer_id`, every layer still
+holding STAC items is downloaded into its own `dest/{layer_id}` subfolder.
 
 Useful config knobs (per product, in `catalog.yml`):
 
@@ -419,7 +450,7 @@ catalog.yml ──▶ load_catalog() ──▶ GeoDataCatalog
        └──────────┴─────────┴─────────┴─────────┴──────────┘
                                       │
                               CatalogResults
-                .explore() · .load() · .sel/.sort/.filter/.first()
+                .explore() · .load() · .download() · .sel/.sort/.filter/.first()
                 .export() · .from_files() · .compute_stats()
 ```
 
