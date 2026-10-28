@@ -2,9 +2,7 @@
 
 Thin convenience layer over :func:`geodatacatalog.explorer.geocode.geocode_place`
 (pure Nominatim, no LLM) for scripts that just want
-``GeoRequest(aoi_gdf=geocode_aoi("Haute-Garonne, France"))``. Not to be confused
-with :func:`geodatacatalog.explorer.resolve_aoi`, the LLM-backed, multi-candidate
-AOI resolver used by the AI assistant/backend.
+``GeoRequest(aoi_gdf=geocode_aoi("Haute-Garonne, France"))``.
 """
 from __future__ import annotations
 

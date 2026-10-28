@@ -1,9 +1,8 @@
 """Place-name geocoding via OpenStreetMap Nominatim — resolve a real AOI.
 
-Used by the AI chat (``geodatacatalog chat``) to turn a named place ("the Lys
-river", "Hérault") into an actual area of interest — a polygon when Nominatim
-has one, otherwise a bounding box — instead of letting the model invent
-coordinates.
+Turns a named place ("Hérault", "Haute-Garonne") into an actual area of interest
+— a polygon when Nominatim has one, otherwise a bounding box — for
+:func:`geodatacatalog.geocode_aoi`.
 
 Nominatim usage policy: a descriptive ``User-Agent`` is mandatory and requests
 are capped at 1/second — both are enforced here.
@@ -13,25 +12,6 @@ from __future__ import annotations
 import time
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-
-#: ISO 3166-1 alpha-2 codes considered European, so a European AOI also accepts
-#: ``europe``-wide sources. Not exhaustive — extend as needed.
-_EUROPE = {
-    "fr", "be", "nl", "lu", "de", "es", "pt", "it", "ch", "at", "gb", "ie",
-    "dk", "se", "no", "fi", "is", "pl", "cz", "sk", "hu", "si", "hr", "ro",
-    "bg", "gr", "ee", "lv", "lt", "ua", "rs", "ba", "me", "mk", "al", "md",
-    "by", "li", "mt", "cy",
-}
-
-#: ISO country code → the registry ``coverage`` label naming that country. Only
-#: the labels the registry actually uses need an entry; others fall back to
-#: continent/global.
-_COUNTRY_COVERAGE = {
-    "fr": "france",
-    "de": "germany",
-    "be": "belgium",
-    "us": "usa",
-}
 
 _last_call = 0.0
 
@@ -89,68 +69,3 @@ def geocode_place(query: str, *, limit: int = 1) -> list[dict]:
             "category": r.get("category") or r.get("class"),
         })
     return out
-
-
-def accepted_coverages(country_code: str | None) -> set[str]:
-    """Registry ``coverage`` labels acceptable for an AOI in ``country_code``.
-
-    Always includes ``global``; adds ``europe`` for European countries and the
-    country's own label (e.g. ``france``) when the registry uses one. Used to
-    keep proposed sources within the requested area.
-    """
-    accepted = {"global"}
-    if not country_code:
-        return accepted
-    cc = country_code.lower()
-    if cc in _EUROPE:
-        accepted.add("europe")
-    if cc in _COUNTRY_COVERAGE:
-        accepted.add(_COUNTRY_COVERAGE[cc])
-    return accepted
-
-
-#: coverage label → approximate extent (lon_min, lat_min, lon_max, lat_max). Lets
-#: us filter sources for an AOI that has no country code (e.g. a sea such as the
-#: Mediterranean), so a country-specific source (``finland``) is not offered for a
-#: disjoint area.
-_COVERAGE_BBOX: dict[str, tuple] = {
-    "france": (-5.5, 41.0, 9.8, 51.5),
-    "europe": (-25.0, 34.0, 45.0, 72.0),
-    "usa": (-125.0, 24.0, -66.0, 49.5),
-    "uk": (-8.7, 49.8, 2.0, 61.0),
-    "germany": (5.8, 47.2, 15.1, 55.1),
-    "spain": (-9.5, 35.9, 4.4, 43.8),
-    "norway": (4.0, 57.9, 31.5, 71.4),
-    "finland": (19.0, 59.5, 31.6, 70.1),
-    "netherlands": (3.3, 50.7, 7.3, 53.6),
-    "belgium": (2.5, 49.5, 6.4, 51.5),
-    "switzerland": (5.9, 45.8, 10.5, 47.9),
-    "canada": (-141.0, 41.6, -52.6, 83.2),
-    "australia": (112.9, -43.7, 153.7, -10.0),
-    "new-zealand": (166.0, -47.4, 178.6, -34.0),
-    "africa": (-20.0, -35.0, 52.0, 38.0),
-}
-
-
-def _bbox_intersect(a: tuple, b: tuple) -> bool:
-    return a[0] <= b[2] and b[0] <= a[2] and a[1] <= b[3] and b[1] <= a[3]
-
-
-def coverages_for_bbox(bbox) -> set[str]:
-    """Coverage labels whose approximate extent intersects an AOI ``bbox``.
-
-    Always includes ``global``; empty when ``bbox`` is unknown (caller keeps all).
-    """
-    if not bbox:
-        return set()
-    accepted = {"global"}
-    for label, ext in _COVERAGE_BBOX.items():
-        if _bbox_intersect(ext, tuple(bbox)):
-            accepted.add(label)
-    return accepted
-
-
-def recommended_coverages(country_code: str | None, bbox=None) -> set[str]:
-    """Accepted coverage labels for an AOI: by country code when known, else by
-    bbox extent (so marine/uncoded AOIs still filter out disjoint countries)."""
-    return accepted_coverages(country_code) if country_code else coverages_for_bbox(bbox)

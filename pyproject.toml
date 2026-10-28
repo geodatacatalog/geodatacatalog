@@ -47,25 +47,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-viz = ["folium", "ipywidgets"]
+viz = ["folium", "ipywidgets", "matplotlib", "mapclassify"]
 osm = ["osmnx"]
 s3 = ["boto3"]                  # signed S3 downloads (e.g. Copernicus Data Space)
 overture = ["pmtiles", "mapbox-vector-tile", "mercantile", "duckdb"]  # Overture: vector-tile path (default, fast) + GeoParquet path (duckdb, exact)
-ai = ["anthropic", "rich", "questionary"]   # `geodatacatalog chat`: Claude + pretty markdown + interactive picker (Mistral needs no anthropic; questionary optional)
-serve = ["fastapi", "uvicorn", "watchfiles", "matplotlib"]  # HTTP sidecar (geodatacatalog.explorer.serve); watchfiles=--reload, matplotlib=raster colormap render
-jupyter = ["nest_asyncio", "ipywidgets", "folium"]
+jupyter = ["nest_asyncio", "ipywidgets", "folium", "matplotlib", "mapclassify"]
 netcdf = ["netcdf4", "odc-algo", "h5netcdf", "fsspec[http]", "s3fs"]  # h5netcdf+fsspec: windowed remote read of NetCDF/HDF5 STAC assets (e.g. PC deltares-floods); s3fs: those hosted on S3 (e.g. Copernicus CLMS *.nc)
-geoagent = ["GeoAgent[browser]>=1.8", "strands-agents[litellm]>=1.37"]  # opengeos GeoAgent tool pack (geoagent_tools/geoagent_serve); litellm = Mistral et al. via LiteLLM
-all = ["folium", "ipywidgets", "osmnx", "boto3", "duckdb", "pmtiles", "mapbox-vector-tile", "mercantile", "anthropic", "rich", "questionary", "fastapi", "uvicorn", "watchfiles", "matplotlib", "nest_asyncio", "netcdf4", "odc-algo", "h5netcdf", "fsspec[http]", "s3fs"]
+all = ["folium", "ipywidgets", "osmnx", "boto3", "duckdb", "pmtiles", "mapbox-vector-tile", "mercantile", "matplotlib", "mapclassify", "nest_asyncio", "netcdf4", "odc-algo", "h5netcdf", "fsspec[http]", "s3fs"]
 dev = ["pytest", "ruff"]
 
 [project.scripts]
 geodatacatalog = "geodatacatalog.explorer.cli:main"
-
-# Third-party tool-pack discovery hook (proposed upstream convention for
-# opengeos/GeoAgent): maps a pack name to a callable returning @geo_tool tools.
-[project.entry-points."geoagent.tool_packs"]
-geodatacatalog = "geodatacatalog.explorer.geoagent_tools:geodatacatalog_tools"
 
 [project.urls]
 Homepage = "https://github.com/tduval/geodatacatalog"

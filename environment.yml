@@ -1,4 +1,4 @@
-# Conda environment for geodatacatalog (chat + full geo stack).
+# Conda environment for geodatacatalog (full geo stack).
 #
 # Create:   conda env create -f environment.yml        (or: mamba env create -f environment.yml)
 # Update:   conda env update -f environment.yml --prune
@@ -35,7 +35,7 @@ dependencies:
   - pillow
   - pyyaml
   - requests
-  # --- optional extras: viz / ai / jupyter / netcdf / s3 / osm ---
+  # --- optional extras: viz / jupyter / netcdf / s3 / osm ---
   - folium
   - ipywidgets
   - nest-asyncio
@@ -46,9 +46,6 @@ dependencies:
   - odc-algo
   - boto3
   - osmnx
-  - rich
-  - questionary
-  - anthropic
   - spyndex
   - pyarrow
   # --- dev ---

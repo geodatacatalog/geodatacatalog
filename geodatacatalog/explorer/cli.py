@@ -9,7 +9,6 @@ Commands:
     preview       fetch one layer on a small bbox → Folium HTML map
     add           add source layers to a catalog.yml (created if missing)
     init-catalog  generate a catalog.yml from a thematic search
-    chat          ask the AI assistant (needs `anthropic` + ANTHROPIC_API_KEY)
 """
 from __future__ import annotations
 
@@ -318,72 +317,6 @@ def cmd_fetch(args) -> int:
     return 0
 
 
-def cmd_chat(args) -> int:
-    from .ai import chat, ensure_available
-
-    reason = ensure_available()
-    if reason:
-        print(f"chat unavailable: {reason}")
-        return 1
-    sources = load_registry(args.registry)
-    chat(" ".join(args.question) if args.question else None, sources)
-    return 0
-
-
-def _emit_json(data: dict, output: str | None) -> None:
-    import json
-    text = json.dumps(data, ensure_ascii=False, indent=2)
-    if output:
-        from pathlib import Path
-        Path(output).parent.mkdir(parents=True, exist_ok=True)
-        Path(output).write_text(text, encoding="utf-8")
-        print(f"written: {output}")
-    else:
-        print(text)
-
-
-def cmd_aoi(args) -> int:
-    """Step 1: NL area description → GeoJSON FeatureCollection of candidate AOIs."""
-    from .ai import ensure_available
-
-    reason = ensure_available()
-    if reason:
-        print(f"aoi unavailable: {reason}")
-        return 1
-    sources = load_registry(args.registry)
-    if args.repl:
-        from .backend import AoiSession, _repl
-        _repl(AoiSession(sources=sources), " ".join(args.query), output=args.output)
-        return 0
-    from .backend import resolve_aoi
-    fc = resolve_aoi(" ".join(args.query), sources=sources, interactive=args.interactive)
-    _emit_json(fc, args.output)
-    return 0
-
-
-def cmd_fetch_aoi(args) -> int:
-    """Step 2: a user AOI GeoJSON + NL request → relevant layers (optionally fetched)."""
-    from .ai import ensure_available
-
-    reason = ensure_available()
-    if reason:
-        print(f"fetch-aoi unavailable: {reason}")
-        return 1
-    sources = load_registry(args.registry)
-    if args.repl:
-        from .backend import LayersSession, _repl
-        session = LayersSession(args.aoi, sources=sources,
-                                fetch=args.fetch or bool(args.export), export_dir=args.export)
-        _repl(session, " ".join(args.query), output=args.output)
-        return 0
-    from .backend import fetch_for_aoi
-    result = fetch_for_aoi(args.aoi, " ".join(args.query), sources=sources,
-                           fetch=args.fetch or bool(args.export), export_dir=args.export,
-                           interactive=args.interactive)
-    _emit_json(result, args.output)
-    return 0
-
-
 # ---------------------------------------------------------------------------
 # Parser
 # ---------------------------------------------------------------------------
@@ -499,31 +432,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-cache", action="store_true", help="bypass the disk cache")
     p.set_defaults(func=cmd_fetch)
 
-    p = sub.add_parser("chat", help="AI assistants")
-    p.add_argument("question", nargs="*", help="one-shot question (REPL when omitted)")
-    p.set_defaults(func=cmd_chat)
-
-    p = sub.add_parser("aoi", help="step 1: NL area → GeoJSON candidate AOIs (backend)")
-    p.add_argument("query", nargs="+", help="area description, e.g. 'EEZ France', 'Lys catchment'")
-    p.add_argument("-i", "--interactive", action="store_true",
-                   help="terminal picker (preview/confirm); writes the chosen AOI")
-    p.add_argument("--repl", action="store_true",
-                   help="refine the AOI in NL across turns (type to refine, 'save [path]', 'q')")
-    p.add_argument("-o", "--output", help="write the GeoJSON FeatureCollection here (else stdout)")
-    p.set_defaults(func=cmd_aoi)
-
-    p = sub.add_parser("fetch-aoi", help="step 2: AOI GeoJSON + NL request → relevant layers (backend)")
-    p.add_argument("aoi", help="AOI GeoJSON (path, or inline JSON) — e.g. step-1 output")
-    p.add_argument("query", nargs="+", help="data request, e.g. 'flood risk', 'land cover'")
-    p.add_argument("--fetch", action="store_true", help="fetch the in-AOI layers (feature counts)")
-    p.add_argument("--export", help="fetch and export the layers to this directory")
-    p.add_argument("-i", "--interactive", action="store_true",
-                   help="terminal picker (toggle/fetch/preview/export/catalog.yml)")
-    p.add_argument("--repl", action="store_true",
-                   help="refine layers in NL across turns ('fetch', 'export <dir>', 'save [path]', 'q')")
-    p.add_argument("-o", "--output", help="write the JSON result here (else stdout)")
-    p.set_defaults(func=cmd_fetch_aoi)
-
     return parser
 
 
@@ -542,9 +450,7 @@ def _enable_http_debug() -> None:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     # Long-running commands log their progress at INFO so the user sees activity.
-    # "chat" is included so the AI assistant's outbound requests to data servers
-    # (WFS/WMS/REST...) are visible by default, not just with -v.
-    verbose_cmds = {"check", "fetch", "preview", "chat"}
+    verbose_cmds = {"check", "fetch", "preview"}
     level = (logging.DEBUG if args.debug else
              logging.INFO if args.verbose or args.command in verbose_cmds else logging.WARNING)
     logging.basicConfig(level=level, format="%(message)s")

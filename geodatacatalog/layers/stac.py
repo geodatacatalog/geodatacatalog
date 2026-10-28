@@ -230,14 +230,14 @@ def _is_zarr_asset(asset) -> bool:
 
 
 def zarr_store_url(asset) -> str:
-    """Browser-loadable https URL for a Zarr STAC asset (abfs/s3/gs → https).
+    """Plain-https URL for a Zarr STAC asset (abfs/s3/gs → https).
 
-    GeoLibre's "Add layer → Zarr" reads a Zarr store over plain HTTP, but STAC
-    assets often point at object storage with a cloud-native scheme (``abfs://`` on
-    Planetary Computer, ``s3://``, ``gs://``). Rewrite those to the public https
-    endpoint so the store is loadable from the browser. Authentication (the SAS
-    token PC mints via ``planetary_computer.sign``) is intentionally NOT added here
-    — that comes in a later step; open data stores work as-is.
+    A Zarr store is read over plain HTTP, but STAC assets often point at object
+    storage with a cloud-native scheme (``abfs://`` on Planetary Computer,
+    ``s3://``, ``gs://``). Rewrite those to the public https endpoint so the store
+    is loadable over HTTP. Authentication (the SAS token PC mints via
+    ``planetary_computer.sign``) is intentionally NOT added here — that comes in a
+    later step; open data stores work as-is.
     """
     from urllib.parse import urlsplit
 
@@ -264,8 +264,8 @@ def zarr_passthrough(items: list, bands: list[str] | None,
 
     Collections whose data assets are Zarr (e.g. Planetary Computer's ``era5-pds``,
     one asset per climate variable) can't go through the odc.stac/rasterio raster
-    path. Instead of rendering server-side, return a passthrough payload pointing at
-    a single variable's Zarr store so the frontend (GeoLibre) loads it directly.
+    path. Instead of loading them, return a passthrough payload pointing at
+    a single variable's Zarr store so a client loads it directly.
     The variable is chosen from ``bands`` (first match) else the first Zarr asset.
     """
     if not items:
@@ -458,7 +458,7 @@ class STACLayer(BaseLayer):
         """Load the selected STAC items via odc.stac.load.
 
         Band precedence: explicit ``bands`` arg → ``request.bands`` (set by the
-        caller/sidecar) → ``product.bands`` → band_mapping → RGB-if-available.
+        caller) → ``product.bands`` → band_mapping → RGB-if-available.
         """
         import math
         import odc.stac

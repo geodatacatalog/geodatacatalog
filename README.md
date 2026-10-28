@@ -36,6 +36,7 @@ The bundled [`catalog.yml`](catalog.yml) focuses on **open French and European d
 - [Configuration (catalog.yml)](#configuration-catalogyml)
 - [Bundled providers](#bundled-providers)
 - [Writing a plugin](#writing-a-plugin)
+- [Exploring new sources](#exploring-new-sources)
 - [Caching](#caching)
 - [Export and reload](#export-and-reload)
 - [Architecture](#architecture)
@@ -266,20 +267,20 @@ auth:
 
 The default [`catalog.yml`](catalog.yml) ships ~40 layers, oriented towards French and European open data:
 
-| Provider | Type | Data | Auth |
-|---|---|---|---|
-| `earth_search` | STAC | Sentinel-2 L2A, Sentinel-1 GRD, Landsat C2L2, Copernicus DEM | — |
-| `cop_dataspace` | STAC | Sentinel-2 L2A, Sentinel-5P NO₂ (official ESA archive) | env vars for download |
-| `geodes` | STAC | THEIA OSO land cover, LAI (CNES) | `GEODES_API_KEY` |
-| `ign` | WFS | communes, départements, buildings, roads, railways, rivers, forest, cadastre, agricultural parcels (RPG), ZNIEFF, Natura 2000, parks | — |
-| `ign_wmts` | WMTS | orthophotos, Plan IGN, BD Forêt v2 (legend), Corine Land Cover 2018 (legend) | — |
-| `brgm` | WFS | geological faults 1:1M | — |
-| `sandre` | WFS | water bodies & watercourses (BD Topage) | — |
-| `hubeau` / `hubeau_nappes` | REST | real-time hydrometry, groundwater piezometers | — |
-| `effis` | WMS | Fire Weather Index, fuel map (Copernicus) | — |
-| `soilgrids_*` | WCS | sand / clay / organic carbon 0-5 cm (ISRIC, global) | — |
-| `gebco` | WMS | global bathymetry | — |
-| `openstreetmap` | OSMNX | road network, water bodies | — |
+| Provider                   | Type  | Data                                                                                                                                 | Auth                  |
+| -------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------- |
+| `earth_search`             | STAC  | Sentinel-2 L2A, Sentinel-1 GRD, Landsat C2L2, Copernicus DEM                                                                         | —                     |
+| `cop_dataspace`            | STAC  | Sentinel-2 L2A, Sentinel-5P NO₂ (official ESA archive)                                                                               | env vars for download |
+| `geodes`                   | STAC  | THEIA OSO land cover, LAI (CNES)                                                                                                     | `GEODES_API_KEY`      |
+| `ign`                      | WFS   | communes, départements, buildings, roads, railways, rivers, forest, cadastre, agricultural parcels (RPG), ZNIEFF, Natura 2000, parks | —                     |
+| `ign_wmts`                 | WMTS  | orthophotos, Plan IGN, BD Forêt v2 (legend), Corine Land Cover 2018 (legend)                                                         | —                     |
+| `brgm`                     | WFS   | geological faults 1:1M                                                                                                               | —                     |
+| `sandre`                   | WFS   | water bodies & watercourses (BD Topage)                                                                                              | —                     |
+| `hubeau` / `hubeau_nappes` | REST  | real-time hydrometry, groundwater piezometers                                                                                        | —                     |
+| `effis`                    | WMS   | Fire Weather Index, fuel map (Copernicus)                                                                                            | —                     |
+| `soilgrids_*`              | WCS   | sand / clay / organic carbon 0-5 cm (ISRIC, global)                                                                                  | —                     |
+| `gebco`                    | WMS   | global bathymetry                                                                                                                    | —                     |
+| `openstreetmap`            | OSMNX | road network, water bodies                                                                                                           | —                     |
 
 Providers with missing credentials are simply skipped at load time — the rest of the catalog still works.
 
@@ -368,16 +369,6 @@ geodatacatalog fetch catalog.yml -l ign__communes --bbox 1.4,43.5,1.5,43.6 \
 
 Generated catalogs are validated with `load_catalog()` before being written. The registry lives in [geodatacatalog/explorer/sources.yml](geodatacatalog/explorer/sources.yml) — PRs adding open sources are welcome.
 
-A natural-language assistant (French or English) helps you find data **and** configure it. It uses real tools — it queries a source's live layer list to find the exact `productType`, then asks the library to generate a validated `catalog.yml` block and the exact CLI command (no invented flags, no hand-written YAML). Set `MISTRAL_API_KEY` (free tier at [console.mistral.ai](https://console.mistral.ai), nothing to install) or `ANTHROPIC_API_KEY` (with `pip install "geodatacatalog[ai]"`):
-
-```bash
-export MISTRAL_API_KEY=...
-geodatacatalog chat "je veux des observations de gypaète barbu en France"
-# · list_layers(source_id='gbif', grep='occurrence')
-# · make_catalog_entry(source_id='gbif', layers=['Gypaetus barbatus'])
-# → the YAML block + `geodatacatalog add gbif "Gypaetus barbatus" -o catalog.yml`
-```
-
 Walkthrough notebook: [examples/explore_sources.ipynb](examples/explore_sources.ipynb).
 
 ## Caching
@@ -441,10 +432,13 @@ geodatacatalog/
 ├── catalog.py        # GeoDataCatalog (fetch orchestration, cache, widgets)
 ├── results.py        # CatalogResults (fluent API, export, stats)
 ├── config.py         # load_catalog() — YAML + env-var interpolation
+├── aoi.py            # geocode_aoi() — place name → AOI GeoDataFrame
 ├── viz.py            # Folium rendering
 ├── utils.py          # legends, raster export, GeoJSON helpers
-└── layers/           # one module per protocol (wfs, wms, wmts, wcs, stac,
-                      #   rest, osmnx, xyz, local, plugin)
+├── layers/           # one module per protocol (wfs, wms, wmts, wcs, stac,
+│                     #   rest, osmnx, xyz, local, plugin)
+└── explorer/         # the `geodatacatalog` CLI: source registry (sources.yml),
+                      #   thematic search, health checks, catalog.yml generation
 ```
 
 ## Contributing

@@ -8,9 +8,8 @@ A curated registry of open services (``sources.yml``) with:
 
 CLI entry point: ``geodatacatalog`` (see ``geodatacatalog --help``).
 """
-from .backend import fetch_for_aoi, resolve_aoi
 from .discover import discover
-from .geocode import accepted_coverages, geocode_place
+from .geocode import geocode_place
 from .inspect import init_catalog, list_layers, merge_into_catalog, preview, to_catalog_provider
 from .markdown import render_markdown, write_markdown
 from .probe import check_sources
@@ -21,14 +20,11 @@ from .verify import apply_results, test_bboxes_geojson, verify_source, verify_so
 __all__ = [
     "Source",
     "THEMES",
-    "accepted_coverages",
     "apply_results",
     "check_sources",
     "discover",
-    "fetch_for_aoi",
     "geocode_place",
     "get_source",
-    "resolve_aoi",
     "init_catalog",
     "list_layers",
     "load_registry",
