@@ -31,15 +31,19 @@ The bundled [`catalog.yml`](catalog.yml) is a ready-to-use **extract of the sour
 - [Installation](#installation)
 - [Quickstart](#quickstart)
 - [GeoRequest — the unified request](#georequest--the-unified-request)
+- [The catalog — where sources become a fetchable config](#the-catalog--where-sources-become-a-fetchable-config)
+  - [The fetch workflow — request in, datasets out](#the-fetch-workflow--request-in-datasets-out)
+  - [The STAC workflow — inspect, sort, then load](#the-stac-workflow--inspect-sort-then-load)
+  - [`load()` vs `download()`](#load-vs-download)
+  - [Band mapping — one name, every provider](#band-mapping--one-name-every-provider)
 - [CatalogResults — working with results](#catalogresults--working-with-results)
-- [The STAC workflow](#the-stac-workflow)
-- [Band mapping — one name, every provider](#band-mapping--one-name-every-provider)
+  - [Export and reload — save results, reopen them later](#export-and-reload--save-results-reopen-them-later)
 - [Configuration (catalog.yml)](#configuration-catalogyml)
 - [Bundled providers](#bundled-providers)
+- [REST APIs — no plugin needed](#rest-apis--no-plugin-needed)
 - [Writing a plugin](#writing-a-plugin)
 - [Exploring new sources](#exploring-new-sources)
 - [Caching](#caching)
-- [Export and reload](#export-and-reload)
 - [Architecture](#architecture)
 - [Contributing](#contributing)
 
@@ -186,31 +190,42 @@ request.explore()                    # show AOI + bbox on a map
 
 **Multi-polygon AOIs.** If `aoi_gdf` has several rows, `fetch` runs one sub-request per polygon (bounded concurrency) and returns a multi-polygon `CatalogResults`. A `datetime` column in the GeoDataFrame sets a per-polygon time window — handy for event-based analysis (one date per site). An `id`/`fid`/`uid` column becomes the `polygon_id`.
 
-## CatalogResults — working with results
+## The catalog — where sources become a fetchable config
 
-`fetch()` returns a `CatalogResults`: dict-like access plus a fluent API.
+A single YAML file drives every fetch: the **catalog** you pass to `load_catalog()`.
+Its root maps a provider name to how the source is searched and which products it
+exposes:
 
-```python
-gdf   = results["ign__communes"]            # GeoDataFrame
-da    = results["ign_wmts__foret"]          # xarray.DataArray
-items = results["earth_search__S2_L2A"]     # list[pystac.Item]
-
-results.explore()                           # all layers on one Folium map
-results.sel("ign_wmts__foret").explore()    # a single layer
-results.compute_stats()                     # per-polygon zonal statistics
-results.export("./output", formats={"ign__communes": "gpkg"})
+```yaml
+provider_name:
+    search: {type: StacSearch, api_endpoint: https://..., need_auth: false}
+    auth:   {credentials: {api_key: ${MY_API_KEY}}}
+    products:
+        my_product: {productType: <remote id>}
 ```
 
-Multi-polygon mode:
+That file is **generated, then curated** — you rarely write it from scratch. The
+explorer's source registry (`geodatacatalog/explorer/sources.yml`, the source of
+truth behind [`SOURCES.md`](SOURCES.md)) describes *where data lives*; `geodatacatalog
+add … -o catalog.yml` turns a registry entry into this fetch-oriented shape. In
+short: **the registry is for discovery, the catalog is for fetching** — `load_catalog()`
+only understands the catalog format, while the registry is browsed through the CLI
+(see [Exploring new sources](#exploring-new-sources) for the field-by-field
+correspondence).
 
-```python
-results[0]                  # CatalogResults of the first polygon
-results["layer_id"]         # that layer across all polygons (list)
-results.sel("layer_id")     # filter every polygon down to one layer
-results.compute_stats()     # one row per polygon
-```
+### The fetch workflow — request in, datasets out
 
-## The STAC workflow
+`fetch(request, layers=[...])` takes one [`GeoRequest`](#georequest--the-unified-request)
+and a list of layer ids, then runs one provider call per layer **in parallel** (async
+I/O, sync clients on a thread pool), caches every result on disk, and returns a
+[`CatalogResults`](#catalogresults--working-with-results) keyed by layer id — each
+value already in its natural type (GeoDataFrame, DataArray, items…). Layers that are
+missing credentials are skipped with a warning instead of failing the whole request.
+
+Every provider shares that contract. What differs is how a layer's *items* are turned
+into data — the STAC case below is the most involved one.
+
+#### The STAC workflow — inspect, sort, then load
 
 STAC layers return raw `pystac.Item`s — inspect, filter, sort, *then* load or download:
 
@@ -225,7 +240,7 @@ sel                                          # items with date, cloud % / covera
     .load(bands=["red", "green", "blue"]))   # odc-stac → xr.Dataset, clipped to AOI
 ```
 
-### `load()` vs `download()`
+##### `load()` vs `download()`
 
 `.load()` builds an `xr.Dataset` in memory (odc-stac, reprojected and clipped to the
 AOI) — the convenient path for COGs readable anonymously or through cloud-native
@@ -263,7 +278,7 @@ Useful config knobs (per product, in `catalog.yml`):
 - `imageCoverageThreshold`: discard items covering less than N % of the AOI.
 - `bandMapping`: map provider asset names to common band names, so `bands=["red","nir"]` works identically on every provider (see below).
 
-### Band mapping — one name, every provider
+##### Band mapping — one name, every provider
 
 Providers name the same physical band differently: Sentinel-2's red band is the
 `red` asset on Earth Search, `B04` elsewhere, and OPERA DSWx-S1's water band is
@@ -299,6 +314,44 @@ mapping get no `eo:bands`, so no spurious alias is exposed.
 > **Tip:** keep the pivot identical across providers (`wtr`, `red`, `nir`, …) and
 > the same request works whatever the source — that is the whole point of the
 > mapping.
+
+## CatalogResults — working with results
+
+`fetch()` returns a `CatalogResults`: dict-like access plus a fluent API.
+
+```python
+gdf   = results["ign__communes"]            # GeoDataFrame
+da    = results["ign_wmts__foret"]          # xarray.DataArray
+items = results["earth_search__S2_L2A"]     # list[pystac.Item]
+
+results.explore()                           # all layers on one Folium map
+results.sel("ign_wmts__foret").explore()    # a single layer
+results.compute_stats()                     # per-polygon zonal statistics
+results.export("./output", formats={"ign__communes": "gpkg"})
+```
+
+Multi-polygon mode:
+
+```python
+results[0]                  # CatalogResults of the first polygon
+results["layer_id"]         # that layer across all polygons (list)
+results.sel("layer_id")     # filter every polygon down to one layer
+results.compute_stats()     # one row per polygon
+```
+
+### Export and reload — save results, reopen them later
+
+```python
+results.export("./output")                       # geojson for vectors, GeoTIFF for rasters
+results.export("./output", formats={
+    "ign__communes": "gpkg",
+    "earth_search__S2_L2A": "nc",
+})
+
+# Later — rebuild a CatalogResults from the exported files
+results = catalog.from_files("./output")         # request restored from _request.json
+results.compute_stats()
+```
 
 ## Configuration (catalog.yml)
 
@@ -467,6 +520,20 @@ geodatacatalog fetch catalog.yml -l ign__communes --bbox 1.4,43.5,1.5,43.6 \
 
 Generated catalogs are validated with `load_catalog()` before being written. The registry lives in [geodatacatalog/explorer/sources.yml](geodatacatalog/explorer/sources.yml) — PRs adding open sources are welcome.
 
+**Registry vs catalog — how an entry maps.** The registry is organised for *discovery* (a flat list of sources with editorial metadata), the catalog for *fetching* (a provider→products dict). `geodatacatalog add` performs the translation:
+
+| `sources.yml` (registry) | `catalog.yml` (fetch config)             |
+| ------------------------ | ---------------------------------------- |
+| root: **list** of sources | root: **dict** `{provider_name: …}`     |
+| `id: earth_search`       | root key `earth_search:`                 |
+| `type: stac`             | `search.type: StacSearch`                |
+| `endpoint: …/v1`         | `search.api_endpoint: …/v1/search`       |
+| `auth: none`             | `search.need_auth: false`                |
+| `auth: api_key`          | `auth.credentials.api_key: ${ID_API_KEY}` |
+| `auth: oauth`            | `auth.credentials.token: ${ID_TOKEN}`    |
+| `layers: [...]`          | `products: {slug: {productType: layer}}` |
+| `themes` · `notes` · `coverage` · `status` · `fetch` | *(discovery-only — not in the catalog)* |
+
 Walkthrough notebook: [examples/explore_sources.ipynb](examples/explore_sources.ipynb).
 
 ## Caching
@@ -486,20 +553,6 @@ To diagnose performance, a profiling script is included:
 
 ```bash
 python scripts/profile_fetch.py catalog.yml -l ign__communes --aoi zones.geojson
-```
-
-## Export and reload
-
-```python
-results.export("./output")                       # geojson for vectors, GeoTIFF for rasters
-results.export("./output", formats={
-    "ign__communes": "gpkg",
-    "earth_search__S2_L2A": "nc",
-})
-
-# Later — rebuild a CatalogResults from the exported files
-results = catalog.from_files("./output")         # request restored from _request.json
-results.compute_stats()
 ```
 
 ## Architecture
