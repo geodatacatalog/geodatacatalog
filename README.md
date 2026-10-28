@@ -280,7 +280,7 @@ Useful config knobs (per product, in `catalog.yml`):
 </details>
 
 <details>
-<summary><b><code>load()</code> vs <code>download()</code></b></summary>
+<summary><b>`load()` vs `download()`</b></summary>
 
 `.load()` builds an `xr.Dataset` in memory (odc-stac, reprojected and clipped to the
 AOI) — the convenient path for COGs readable anonymously or through cloud-native
