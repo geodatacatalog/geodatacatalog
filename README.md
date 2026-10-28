@@ -254,8 +254,7 @@ missing credentials are skipped with a warning instead of failing the whole requ
 Every provider shares that contract. What differs is how a layer's *items* are turned
 into data — the STAC case below is the most involved one.
 
-<details>
-<summary>The STAC workflow — inspect, sort, then load</summary>
+#### The STAC workflow — inspect, sort, then load
 
 STAC layers return raw `pystac.Item`s — inspect, filter, sort, *then* load or download:
 
@@ -277,10 +276,7 @@ Useful config knobs (per product, in `catalog.yml`):
 - `imageCoverageThreshold`: discard items covering less than N % of the AOI.
 - `bandMapping`: map provider asset names to common band names, so `bands=["red","nir"]` works identically on every provider (see below).
 
-</details>
-
-<details>
-<summary>load() vs download()</summary>
+#### load() vs download()
 
 `.load()` builds an `xr.Dataset` in memory (odc-stac, reprojected and clipped to the
 AOI) — the convenient path for COGs readable anonymously or through cloud-native
@@ -311,10 +307,7 @@ dataset:
 pivots, e.g. `"wtr"`), exactly like `load()`. Without `layer_id`, every layer still
 holding STAC items is downloaded into its own `dest/{layer_id}` subfolder.
 
-</details>
-
-<details>
-<summary>Band mapping — one name, every provider</summary>
+#### Band mapping — one name, every provider
 
 Providers name the same physical band differently: Sentinel-2's red band is the
 `red` asset on Earth Search, `B04` elsewhere, and OPERA DSWx-S1's water band is
@@ -351,10 +344,7 @@ mapping get no `eo:bands`, so no spurious alias is exposed.
 > the same request works whatever the source — that is the whole point of the
 > mapping.
 
-</details>
-
-<details>
-<summary>Authentication patterns</summary>
+#### Authentication patterns
 
 ```yaml
 auth:
@@ -380,8 +370,6 @@ auth:
 `${VAR}` / `${VAR:-default}` are resolved from the environment at load time.
 Providers whose variables are unset are skipped with a warning; everything else
 keeps working. See [Installation](#installation) for how to provide the secrets.
-
-</details>
 
 ## CatalogResults — working with results
 
