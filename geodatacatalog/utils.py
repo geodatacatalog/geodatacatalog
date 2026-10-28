@@ -75,3 +75,42 @@ def _apply_legend(da: xr.DataArray, legend: dict[str, str]) -> xr.DataArray:
         y_coords = da.y.values if "y" in da.coords else np.arange(canvas.shape[1])
         return _rgba_to_classes(canvas, x_coords, y_coords, legend)
     return da
+
+
+def _normalise_legend(legend: dict) -> dict:
+    """Normalise a legend config into ``{int_value: {"color": ..., "label": ...}}``.
+
+    Accepts the two shapes found in ``catalog.yml``:
+
+    - ``{hex_color: label}`` — the WMS/WMTS/XYZ style (Corine, BD Forêt): the
+      class value is the *position* of the entry (1-based), matching
+      :func:`_rgba_to_classes`, and the color is the key.
+    - ``{value: label}`` or ``{value: {label: ..., color: ...}}`` — the explicit
+      style for already-categorical rasters (e.g. a STAC LULC collection that
+      ships integer class codes): the key *is* the pixel value.
+
+    The returned mapping is attached to ``da.attrs["legend"]`` so callers can
+    resolve a category (e.g. "Water") without hardcoding its code.
+    """
+    out: dict[int, dict] = {}
+    for i, (key, val) in enumerate(legend.items(), start=1):
+        if isinstance(val, dict):  # {value: {label:..., color:...}}
+            label = val.get("label")
+            color = val.get("color")
+        else:
+            label, color = val, None
+        # A hex string key → positional class value (WMS RGBA style);
+        # otherwise the key is the pixel value itself (explicit style).
+        if isinstance(key, str) and key.startswith("#") and len(key) == 7:
+            value = i
+            color = color or key
+        else:
+            try:
+                value = int(key)
+            except (TypeError, ValueError):
+                value = i
+        entry: dict = {"label": label}
+        if color:
+            entry["color"] = color
+        out[value] = entry
+    return out

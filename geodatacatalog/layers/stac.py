@@ -18,6 +18,7 @@ from pystac_client.exceptions import APIError as _StacAPIError
 
 from ..base import BaseLayer, LayerKind, LayerResult, retry_on_network_error
 from ..request import GeoRequest
+from ..utils import _normalise_legend
 
 log = logging.getLogger(__name__)
 
@@ -390,6 +391,7 @@ class STACLayer(BaseLayer):
                  cloud_cover_aoi: int | None = None,
                  image_coverage_threshold: int = 0,
                  band_mapping: dict[str, str] | None = None,
+                 legend: dict | None = None,
                  sort_by: Literal["cloud_cover", "date", "date_asc"] | None = None,
                  static: bool = False,
                  headers: dict[str, str] | None = None,
@@ -410,6 +412,7 @@ class STACLayer(BaseLayer):
             collection=collection,
             bands=bands,
             band_mapping=band_mapping or {},
+            legend=legend or {},
             cloud_cover=cloud_cover,
             cloud_cover_aoi=cloud_cover_aoi,
             image_coverage_threshold=image_coverage_threshold,
@@ -612,6 +615,14 @@ class STACLayer(BaseLayer):
         for var in ds.data_vars.values():
             if "_FillValue" in var.attrs and var.rio.nodata is None:
                 var.rio.write_nodata(var.attrs["_FillValue"], inplace=True)
+        # Attach the configured class legend (pixel value → label/color) to every
+        # variable, so a caller can reclassify without re-declaring the classes
+        # in code (``da.attrs["legend"]``, same shape as the WMS/WMTS path).
+        if self.product.legend:
+            legend = _normalise_legend(self.product.legend)
+            for var in ds.data_vars.values():
+                var.attrs["legend"] = legend
+            ds.attrs["legend"] = legend
         return ds
 
     def download(self, items, request: GeoRequest, dest, bands: list[str] | None = None) -> list[Path]:
@@ -622,6 +633,11 @@ class STACLayer(BaseLayer):
         neither COG nor openly readable — the caller often just wants the original
         file. Band precedence mirrors ``load``: explicit ``bands`` → ``request.bands``
         → ``product.bands`` → every non-helper data asset. One file per (item, asset).
+
+        ``bands`` accepts **either** provider asset keys (``"0_B01_WTR"``) **or**
+        the pivot/common names from the product's ``bandMapping`` (``"wtr"``), so
+        the same provider-agnostic name works through both ``load()`` and
+        ``download()``. Both directions are resolved via ``band_mapping``.
         """
         import shutil
         from urllib.parse import urlsplit
@@ -635,8 +651,14 @@ class STACLayer(BaseLayer):
         paths = []
         for item in items:
             assets = item.assets
-            keys = [k for k in (effective_bands or assets)
-                    if k in assets and not _is_helper_asset(assets[k])]
+            if effective_bands:
+                keys = []
+                for name in effective_bands:
+                    key = self._resolve_asset_key(name, assets)
+                    if key is not None and key not in keys:
+                        keys.append(key)
+            else:
+                keys = [k for k in assets if not _is_helper_asset(assets[k])]
             if not keys:
                 raise RuntimeError(f"[{self.layer_id}] no data asset to download on item {item.id}")
             for key in keys:
@@ -649,6 +671,21 @@ class STACLayer(BaseLayer):
                 paths.append(out)
         log.info(f"[{self.layer_id}] downloaded {len(paths)} file(s) → {dest}")
         return paths
+
+    def _resolve_asset_key(self, name: str, assets: dict) -> str | None:
+        """Resolve a band ``name`` to an asset key of ``assets``.
+
+        Accepts a provider asset key as-is, or a pivot/common name declared in
+        the product's ``bandMapping`` (``{asset: pivot}``) — the same names
+        ``load()`` understands, so ``["wtr"]`` works on both paths. Helper
+        assets are never returned; an unresolvable name is skipped (``None``).
+        """
+        if name in assets and not _is_helper_asset(assets[name]):
+            return name
+        for asset_key, pivot in self.product.band_mapping.items():
+            if pivot == name and asset_key in assets and not _is_helper_asset(assets[asset_key]):
+                return asset_key
+        return None
 
     def _open_asset_stream(self, asset):
         """A binary file-like object for a STAC asset's href, honouring per-cloud auth.
