@@ -19,9 +19,9 @@ results = catalog.fetch(request, layers=[
 results.explore()               # interactive Folium map
 ```
 
-The bundled [`catalog.yml`](catalog.yml) focuses on **open French and European data**: IGN Géoplateforme, Copernicus (Sentinel, EFFIS, Corine Land Cover), CNES THEIA, Hub'Eau, BRGM, SANDRE, ISRIC SoilGrids, GEBCO and OpenStreetMap. Adding a provider requires zero Python code.
+The bundled [`catalog.yml`](catalog.yml) is a ready-to-use **extract of the source registry**: it picks a curated subset of providers from [`geodatacatalog/explorer/sources.yml`](geodatacatalog/explorer/sources.yml) — the health-checked registry of open geospatial services — and focuses on **open French and European data**: IGN Géoplateforme, Copernicus (Sentinel, EFFIS, Corine Land Cover), CNES THEIA, Hub'Eau, BRGM, SANDRE, ISRIC SoilGrids, GEBCO and OpenStreetMap. The registry is the source of truth (159 sources); [`SOURCES.md`](SOURCES.md) is generated from it, and `geodatacatalog add … -o catalog.yml` materialises any registry entry as a catalog layer. Adding a provider requires zero Python code.
 
-> Interactive walkthrough: see [example.ipynb](example.ipynb).
+> Interactive walkthrough: see [notebooks/example.ipynb](notebooks/example.ipynb).
 
 ---
 
@@ -33,6 +33,7 @@ The bundled [`catalog.yml`](catalog.yml) focuses on **open French and European d
 - [GeoRequest — the unified request](#georequest--the-unified-request)
 - [CatalogResults — working with results](#catalogresults--working-with-results)
 - [The STAC workflow](#the-stac-workflow)
+- [Band mapping — one name, every provider](#band-mapping--one-name-every-provider)
 - [Configuration (catalog.yml)](#configuration-catalogyml)
 - [Bundled providers](#bundled-providers)
 - [Writing a plugin](#writing-a-plugin)
@@ -233,7 +234,44 @@ Useful config knobs (per product, in `catalog.yml`):
 - `cloudCover`: filter on the `eo:cloud_cover` metadata.
 - `cloudCoverAoi`: compute the *actual* cloud fraction over your AOI from the SCL band (slower, much more accurate).
 - `imageCoverageThreshold`: discard items covering less than N % of the AOI.
-- `bandMapping`: map provider asset names to common band names, so `bands=["red","nir"]` works identically on every provider.
+- `bandMapping`: map provider asset names to common band names, so `bands=["red","nir"]` works identically on every provider (see below).
+
+### Band mapping — one name, every provider
+
+Providers name the same physical band differently: Sentinel-2's red band is the
+`red` asset on Earth Search, `B04` elsewhere, and OPERA DSWx-S1's water band is
+the `0_B01_WTR` asset. `bandMapping` declares a **pivot** (a provider-agnostic
+common name) for each provider asset, so your code never mentions the provider's
+own key:
+
+```yaml
+products:
+    opera_dswx_s1:
+        productType: OPERA_L3_DSWX-S1_V1_1.0
+        bandMapping:
+        - 0_B01_WTR: wtr      # provider asset → pivot
+        - 0_B02_BWTR: bwtr
+        - 0_B03_CONF: conf
+```
+
+```python
+results.load(bands=["wtr"])                       # XR Dataset, the provider key stays hidden
+results.download(bands=["wtr"], dest="./tiles")   # same pivot, raw file on disk
+```
+
+Both `load()` and `download()` accept **either** the provider asset key
+(`"0_B01_WTR"`) **or** the pivot (`"wtr"`); resolution goes through `bandMapping`.
+
+**How it works.** At search time the mapping is written onto each STAC item as an
+`eo:bands` entry — `{"name": <asset>, "common_name": <pivot>}` — and the `eo`
+extension is registered on the item, so odc-stac's alias resolver exposes the
+pivot as a band name (`eo:common_name` → the asset's canonical name). This is
+also why a product can map only the bands you care about: assets left out of the
+mapping get no `eo:bands`, so no spurious alias is exposed.
+
+> **Tip:** keep the pivot identical across providers (`wtr`, `red`, `nir`, …) and
+> the same request works whatever the source — that is the whole point of the
+> mapping.
 
 ## Configuration (catalog.yml)
 
@@ -251,6 +289,8 @@ provider_name:
             productType: <remote identifier>
             description: Human readable description
             static: true        # no time dimension → datetime filter skipped
+            bandMapping:        # provider asset → pivot (common name); optional
+                B04: red
 ```
 
 Layer ids are `{provider_name}__{product_id}`. The format is inspired by [EODAG](https://github.com/CS-SI/eodag) provider files.
@@ -379,7 +419,7 @@ For deeper integration (custom caching, async fetch), subclass `BaseLayer` and i
 
 ## Exploring new sources
 
-The `geodatacatalog` CLI (the *explorer* sub-project) ships a curated, health-checked registry of **~90 open geospatial services** — see [SOURCES.md](SOURCES.md). It takes you from "where can I find X?" to a working `catalog.yml`:
+The `geodatacatalog` CLI (the *explorer* sub-project) ships a curated, health-checked registry of **159 open geospatial services** — see [SOURCES.md](SOURCES.md) (generated from the registry). It takes you from "where can I find X?" to a working `catalog.yml`:
 
 ```bash
 # Discover & configure sources (operate on the source registry)
